@@ -3,5 +3,8 @@ flask-sqlalchemy
 faker
 requests
 flask_cors
-flask-jwt-extended
 apscheduler
+eventlet
+greenlet
+gevent
+gunicorn
