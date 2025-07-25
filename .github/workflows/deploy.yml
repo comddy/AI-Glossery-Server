@@ -16,7 +16,4 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /opt/opt/AI-Glossery-Server
-            git pull --rebase
-            docker-compose up -d --build
+          script: "cd /opt/opt/AI-Glossery-Server && ./start_script.sh"
