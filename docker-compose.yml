@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./deepspring-tech.com.key:/app/deepspring-tech.com.key:ro
+      - ./deepspring-tech.com.pem:/app/deepspring-tech.com.pem:ro
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

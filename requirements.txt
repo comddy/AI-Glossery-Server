@@ -1,0 +1,7 @@
+flask
+flask-sqlalchemy
+faker
+requests
+flask_cors
+flask-jwt-extended
+apscheduler
