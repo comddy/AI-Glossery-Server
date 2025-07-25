@@ -15,5 +15,5 @@ jobs:
         with:
           host: ${{ secrets.ALIYUN_SERVER_IP }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
           script: "cd /opt/opt/AI-Glossery-Server && ./start_script.sh"
