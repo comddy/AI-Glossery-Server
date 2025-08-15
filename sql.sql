@@ -103,3 +103,29 @@ CREATE TABLE IF NOT EXISTS user_achievement(
     icon TEXT,
     is_active INTEGER DEFAULT 0, -- 0无1有
 )
+
+CREATE TABLE IF NOT EXISTS trade_transaction(
+    trade_transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT NOT NULL,
+    receiver TEXT NOT NULL,
+	amount INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    previous_hash TEXT,
+	current_hash TEXT
+)
+
+CREATE TABLE IF NOT EXISTS story_collection(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    content TEXT,
+    content_zh TEXT,
+    cover_img TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+
+CREATE TABLE TABLE IF NOT EXISTS "user_story_collection_ref" (
+	"id"	INTEGER,
+	"user_id"	INTEGER NOT NULL,
+	"story_collection_id"	INTEGER NOT NULL,
+	PRIMARY KEY("id" AUTOINCREMENT)
+)

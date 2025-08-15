@@ -1,4 +1,7 @@
-from flask import Flask, jsonify, request, send_file
+import hashlib
+import time
+
+from flask import Flask, jsonify, request, send_file, Response
 from flask_cors import CORS
 import os
 import json
@@ -7,15 +10,21 @@ import requests
 
 from AchievementStrategy import AchievementService, daily_achievement_check
 from sql_alchemy import db, User, UserWordMastery, Word, ChatMessage, AIAgent, \
-    WordFriendLevelConfig, UserAchievement, WordFriend
-from crud.user import create_user, get_user_info, init_user
+    WordFriendLevelConfig, UserAchievement, WordFriend, TradeTransaction, StoryCollection
+from crud.user import create_user, get_user_info, init_user, get_learning_percent
 from crud.ai_agent import create_agent
 from crud.chat_message import insert_message, get_messages
 
 from datetime import timedelta, datetime, date
-from sqlalchemy import select, func
+from sqlalchemy import select, func, join
 
 from apscheduler.schedulers.background import BackgroundScheduler
+
+from utils.UserUtil import generate_hex_id
+
+import soundfile as sf
+import io
+from kokoro_onnx import Kokoro
 
 
 def create_app():
@@ -36,6 +45,9 @@ def create_app():
 
 
 app = create_app()
+
+# Initialize the audio generator
+audio_generator = Kokoro("kokoro-v1.0.onnx", "voices-v1.0.bin")
 
 # 允许所有域名跨域访问
 CORS(app)
@@ -72,7 +84,13 @@ def wx_login():
                     "username": user.username,
                     "email": user.email,
                     "avatar_url": user.avatar_url,
-                    "user_id": user.user_id
+                    "user_id": user.user_id,
+                    "wallet_key": user.wallet_key,
+                    "word_power_amount": user.word_power_amount,
+                    "preferred_plan": {
+                        "preferred": user.preferred_classification,
+                        "plan_amount": user.preferred_plan_daily
+                    }
                 },
                 "is_first_login": False
             })
@@ -86,7 +104,13 @@ def wx_login():
                     "username": user.username,
                     "email": user.email,
                     "avatar_url": user.avatar_url,
-                    "user_id": user.user_id
+                    "user_id": user.user_id,
+                    "wallet_key": user.wallet_key,
+                    "word_power_amount": user.word_power_amount,
+                    "preferred_plan": {
+                        "preferred": user.preferred_classification,
+                        "plan_amount": user.preferred_plan_daily
+                    }
                 },
                 "is_first_login": True
             })
@@ -112,7 +136,7 @@ def story_generation():
                 "message": "缺少必要参数: prompt 或 theme"
             }), 400
 
-        system_prompt = f'你是一个英语学习智能助手，你需要根据用户提供的单词或主题，生成一个尽量复合{theme}主题的英文故事。请确保故事生动有趣，并在故事中合理使用目标单词。生成的故事长度应该适中，建议在300字左右。在故事原文中，把用户给出的单词用括号括起来。请按照以下JSON格式返回："story_title": "故事标题","story_content": "英文故事原文","chinese_translation": "中文翻译"'
+        system_prompt = f'你是一个英语学习智能助手，你需要根据用户提供的单词或主题，生成一个{theme}主题的英文故事。请确保故事生动有趣，并在故事中合理使用目标单词。生成的故事长度应该适中，建议在300字左右。在故事原文中，把用户给出的单词用括号括起来。请按照以下JSON格式返回："story_title": "故事标题","story_content": "英文故事原文","chinese_translation": "中文翻译"'
 
         # 这里需要替换为实际的API调用
         # 由于Python中没有直接等效的axios，我们使用requests库
@@ -138,7 +162,7 @@ def story_generation():
             'https://open.bigmodel.cn/api/paas/v4/chat/completions',
             json=payload,
             headers=headers,
-            # proxies=proxies,  # 添加代理配置
+            proxies=proxies,  # 添加代理配置
             timeout=10
         )
 
@@ -167,9 +191,15 @@ def story_generation():
             print(result)
             raise Exception('故事生成结果格式不完整')
 
+        result['story_content'] = result['story_content'].replace('(', '').replace(')', '')
         return jsonify({
             "success": True,
-            "data": result
+            "data": {
+                'content': result['story_content'],
+                'content_zh': result['chinese_translation'],
+                'title': result['story_title'],
+                'selected_words': prompt.split(',')
+            }
         })
 
     except Exception as e:
@@ -431,7 +461,8 @@ def mark_mastered():
     POST /api/mark-mastered
     请求体: {
         "user_id": 123,
-        "word_id": 456
+        "word_id": 456,
+        "word_type": 'CET4',
     }
     """
     data = request.get_json()
@@ -442,14 +473,15 @@ def mark_mastered():
 
     user_id = data['user_id']
     word_id = data['word_id']
+    word_type = data['word_type']
 
     # 检查是否已存在记录
-    if UserWordMastery.query.filter_by(user_id=user_id, word_id=word_id).first():
+    if UserWordMastery.query.filter_by(user_id=user_id, word_id=word_id, word_type=word_type).first():
         return jsonify({'message': 'Word already marked as mastered'}), 200
 
     # 创建新记录
     try:
-        mastery = UserWordMastery(user_id=user_id, word_id=word_id, created_at=datetime.now())
+        mastery = UserWordMastery(user_id=user_id, word_id=word_id, word_type=word_type, created_at=datetime.now())
         db.session.add(mastery)
         db.session.commit()
         AchievementService.check_achievements(user_id)  # 成就埋点
@@ -466,11 +498,11 @@ def mark_mastered():
 def get_words():
     """
     获取单词列表(基于用户掌握进度返回10个)
-    GET /api/words?user_id=123
     """
     try:
         user_id = request.args.get('user_id', type=int)
-        if not user_id:
+        classification = request.args.get('classification', type=str)
+        if not user_id or not classification:
             return jsonify({
                 'success': False,
                 'message': 'user_id参数必须提供',
@@ -478,14 +510,21 @@ def get_words():
             }), 400
 
         # 查询用户已掌握的单词数量
+        mapping = {
+            '雅思词汇': 'IELTS',
+            '六级词汇': 'CET6',
+            '四级词汇': 'CET4',
+        }
+        mapping_type = mapping[classification]
         mastered_count = UserWordMastery.query.filter_by(
-            user_id=user_id
+            user_id=user_id,
+            word_type=classification
         ).count()
 
         offset = mastered_count
 
         # 查询单词(从偏移量位置开始取10个)
-        words = Word.query.order_by(Word.word_id).offset(offset).limit(10).all()
+        words = Word.query.filter_by(classification=mapping_type).order_by(Word.word_id).offset(offset).limit(10).all()
 
         # 格式化返回数据
         words_data = [{
@@ -544,7 +583,7 @@ def get_latest_message_time():
 
         if not latest_message:
             return jsonify({
-                'success': True,
+                'success': False,
                 'message': '该用户暂无聊天记录',
                 'data': None
             })
@@ -588,6 +627,7 @@ def get_today_mastered_words():
         start_date = today.strftime("%Y-%m-%d 00:00:00")
         end_date = today.strftime("%Y-%m-%d 23:59:59")
         query = select(func.count()).where(
+            UserWordMastery.user_id == user_id,
             UserWordMastery.created_at.between(start_date, end_date)
         )
         count = db.session.scalar(query)
@@ -632,6 +672,9 @@ def add_word_friend_exp():
         user_word_friend.level = current_level + 1
     else:
         user_word_friend.exp = added_exp
+
+    user = db.session.query(User).filter_by(user_id=user_word_friend.user_id).first()
+    user.word_power_amount += add_exp  # todo:这里暂时用加的经验代表词力值
     db.session.commit()  # 修改直接查到之后原地改了，直接commit
 
     return jsonify({
@@ -693,6 +736,7 @@ def robot():
         download_name='RobotExpressive.glb'  # 下载时显示的文件名
     )
 
+
 @app.route("/api/test", methods=['GET'])
 def test():
     user_id = request.args.get('user_id', type=int)
@@ -708,9 +752,330 @@ def test():
         "data": word_count
     })
 
-@app.route("/api/testwy", methods=['GET'])
-def testwy():
-    return "testwy"
+
+# 转账功能
+@app.route('/api/transaction/create', methods=['POST'])
+def create_transaction():
+    data = request.get_json()
+    sender = data.get('sender')
+    receiver = data.get('receiver')
+    amount = data.get('amount')
+
+    if not all([sender, receiver, amount]):
+        return jsonify({"error": "Missing parameters"}), 400
+
+    if amount <= 0:
+        return jsonify({"error": "Amount must be positive"}), 400
+
+    try:
+        # 检查发送者余额
+        sender_user = db.session.query(User).filter_by(wallet_key=sender).first()
+        if not sender_user:
+            return jsonify({"error": "Sender not found"}), 404
+
+        if sender_user.word_power_amount < amount:
+            return jsonify({"error": "Insufficient word power"}), 400
+
+        # 检查接收者是否存在
+        receiver_user = db.session.query(User).filter_by(wallet_key=receiver).first()
+        if not receiver_user:
+            return jsonify({"error": "Receiver not found"}), 404
+
+        # 获取上一个交易的hash
+        last_tx = db.session.query(TradeTransaction).order_by(TradeTransaction.created_at.desc()).first()
+        previous_hash = last_tx.current_hash if last_tx else "0"
+
+        # 创建交易数据
+        tx_id = generate_hex_id()
+        current_time = datetime.now()
+        tx_data = f"{tx_id}{sender}{receiver}{amount}{current_time}{previous_hash}"
+        current_hash = hashlib.sha256(tx_data.encode()).hexdigest()
+
+        # 创建交易记录
+        new_transaction = TradeTransaction(
+            sender=sender,
+            receiver=receiver,
+            amount=amount,
+            created_at=current_time,
+            previous_hash=previous_hash,
+            current_hash=current_hash
+        )
+        db.session.add(new_transaction)
+
+        # 更新双方余额
+        sender_user.word_power_amount -= amount
+        receiver_user.word_power_amount += amount
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Transaction created",
+            "transaction_id": tx_id,
+            "hash": current_hash
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# 查询用户交易记录
+@app.route('/api/transactions/<wallet_key>', methods=['GET'])
+def get_transactions(wallet_key):
+    # 检查用户是否存在
+    user = db.session.query(User).filter_by(wallet_key=wallet_key).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # 查询用户相关的交易
+    transactions = db.session.query(TradeTransaction).filter(
+        (TradeTransaction.sender == wallet_key) | (TradeTransaction.receiver == wallet_key)
+    ).order_by(TradeTransaction.created_at.desc()).all()
+
+    transactions_data = [{
+        "id": tx.id,
+        "sender": tx.sender,
+        "receiver": tx.receiver,
+        "amount": tx.amount,
+        "created_at": tx.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        "previous_hash": tx.previous_hash,
+        "current_hash": tx.current_hash
+    } for tx in transactions]
+
+    return jsonify({
+        "public_key": wallet_key,
+        "transactions": transactions_data,
+        "count": len(transactions_data)
+    })
+
+
+@app.route("/api/update_preferred", methods=['POST'])
+def update_preferred_classification_book():
+    data = request.get_json()
+    print(data)
+    user_id = data['user_id']
+    preferred = data['preferred']
+
+    user = User.query.filter_by(user_id=user_id).first()
+    user.preferred_classification = preferred
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "message": "Preferred classification book updated"
+    })
+
+
+@app.route("/api/update_plan_amount", methods=['POST'])
+def update_plan_amount():
+    data = request.get_json()
+    print(data)
+    user_id = data['user_id']
+    amount = data['amount']
+
+    user = User.query.filter_by(user_id=user_id).first()
+    user.preferred_plan_daily = amount
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "message": "Preferred plan amount updated",
+        "data": amount
+    })
+
+
+@app.route('/api/generate_audio', methods=['GET'])
+def generate_audio():
+    """
+    Endpoint to generate audio from text
+
+    Expects JSON payload with:
+    - text: the text to convert to speech
+    - voice: voice identifier (optional, default "af_sarah")
+    - speed: speech speed (optional, default 1.0)
+    - lang: language code (optional, default "en-us")
+    """
+    try:
+        # Get request data
+        text = request.args.get('text')
+        voice = 'af_sarah'
+        speed = 1.0
+        lang = "en-us"
+
+        if not text:
+            return {"error": "Text parameter is required"}, 400
+
+        # Generate audio
+        samples, sample_rate = audio_generator.create(
+            text=text,
+            voice=voice,
+            speed=speed,
+            lang=lang
+        )
+
+        # Create in-memory WAV file
+        wav_io = io.BytesIO()
+        sf.write(wav_io, samples, sample_rate, format='WAV')
+        wav_io.seek(0)
+
+        # Return as binary response
+        return Response(
+            wav_io.read(),
+            mimetype='audio/wav',
+            headers={
+                'Content-Disposition': 'attachment; filename=generated_audio.wav'
+            }
+        )
+
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@app.route('/api/get_today_learned_words', methods=['GET'])
+def get_today_learned_words():
+    # 获取user_id参数
+    user_id = request.args.get('user_id', type=int)
+
+    # 验证参数
+    if not user_id:
+        return jsonify({
+            'success': False,
+            'message': '必须提供user_id参数'
+        }), 400
+
+    try:
+        today = datetime.today()
+        start_date = today.strftime("%Y-%m-%d 00:00:00")
+        end_date = today.strftime("%Y-%m-%d 23:59:59")
+
+        # 构建联合查询获取word_en
+        query = select(Word.word_en, Word.word_cn).select_from(
+            join(UserWordMastery, Word, UserWordMastery.word_id == Word.word_id)
+        ).where(
+            UserWordMastery.user_id == user_id,
+            UserWordMastery.created_at.between(start_date, end_date)
+        ).order_by(UserWordMastery.created_at.desc())
+
+        # 执行查询获取所有结果
+        results = db.session.execute(query).all()
+
+        # 格式化返回数据
+        word_list = []
+        for row in results:
+            try:
+                meaning = json.loads(row.word_cn)[0]["tran"]
+            except Exception as e:
+                meaning = ""
+            word_list.append({
+                'text': row.word_en,
+                'meaning': meaning,
+                'selected': False
+            })
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'date': today.strftime("%Y-%m-%d"),
+            'count': len(word_list),
+            'words': word_list  # 直接返回英文单词列表
+        })
+
+    except Exception as main_error:
+        # 添加详细错误日志
+        app.logger.error(f"获取今日单词失败 - 用户ID {user_id}: {str(main_error)}")
+        return jsonify({
+            'success': False,
+            'message': '获取今日掌握单词列表失败',
+            'error': str(main_error)
+        }), 500
+
+@app.route('/api/get_story_collections', methods=['GET'])
+def get_story_collections():
+    user_id = request.args.get('user_id', type=int)
+    # 验证参数
+    if not user_id:
+        return jsonify({
+            'success': False,
+            'message': '必须提供user_id参数'
+        }), 400
+
+    user = User.query.filter_by(user_id=user_id).first()
+    stories = [story.to_dict() for story in user.stories]
+    return jsonify({
+        'success': True,
+        'data': stories,
+        'message': "查询成功"
+    })
+
+@app.route('/api/collect_story', methods=['POST'])
+def collect_story():
+    data = request.get_json()
+    title = data.get('title')
+    content = data.get('content')
+    content_zh = data.get('content_zh')
+    cover_img = data.get('cover_img', '')
+    selected_words = data.get('selected_words', '')
+    user_id = data.get('user_id')
+
+    # 参数验证（确保必填字段不为空）
+    if not all([title, content, content_zh, user_id]):
+        return jsonify({
+            'success': False,
+            'message': '缺少必要参数: title, content或user_id'
+        }), 400
+
+    # 检查是否已收藏
+    story_collection = StoryCollection.query.filter_by(title=title, user_id=user_id).first()
+    if story_collection:
+        try:
+            db.session.delete(story_collection)  # 直接删除收藏记录
+            db.session.commit()
+            return jsonify({
+                "success": True,
+                "message": "取消收藏成功"
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                "success": False,
+                "message": f"取消收藏失败: {str(e)}"
+            }), 500
+    try:
+        story = StoryCollection()
+        story.title = title
+        story.content = content
+        story.content_zh = content_zh
+        story.cover_img = cover_img
+        story.selected_words = selected_words
+        story.user_id = user_id
+        db.session.add(story)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '收藏成功'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e),
+        })
+
+@app.route('/api/user/learning_percent', methods=['GET'])
+def learning_percent():
+    # 获取数
+    user_id = request.args.get('user_id', type=int)
+    word_type = request.args.get('word_type', type=str)
+
+    # 验证参数
+    if not user_id and not word_type:
+        return jsonify({
+            'success': False,
+            'message': '参数有误'
+        }), 400
+
+    percent = get_learning_percent(user_id, word_type)
+    return jsonify({
+        'success': True,
+        'data': percent
+    })
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    # app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    app.run(debug=True, host='0.0.0.0', port=5000)

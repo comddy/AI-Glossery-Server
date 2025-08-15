@@ -1,7 +1,8 @@
 # 创建用户
 from faker import Faker
 
-from sql_alchemy import User, db, WordFriend, WordFriendLevelConfig, UserWordMastery, UserAchievement
+from sql_alchemy import User, db, WordFriend, WordFriendLevelConfig, UserWordMastery, UserAchievement, Word
+from utils.UserUtil import generate_hex_id
 
 
 def create_user(**kwargs):
@@ -76,7 +77,8 @@ def get_user_info(user_id):
         },
         'user_info': {
             "learning_days": learning_days,
-            "mastery_word_count": mastery_word_count
+            "mastery_word_count": mastery_word_count,
+            "word_power_amount": word_friend.user.word_power_amount,
         }
     }
 
@@ -86,7 +88,8 @@ def init_user(openid, session_key):
     user = create_user(
         username=username,
         wechat_openid=openid,
-        wechat_session_key=session_key
+        wechat_session_key=session_key,
+        wallet_key=generate_hex_id()
     )
     db.session.add(user)
     user_id = user.user_id
@@ -127,3 +130,14 @@ def init_user(openid, session_key):
     db.session.add(new_word_friend)
     db.session.commit()
     return user
+
+
+def get_learning_percent(user_id, word_type):
+    mapping = {
+        '雅思词汇': 'IELTS',
+        '六级词汇': 'CET6',
+        '四级词汇': 'CET4',
+    }
+    mapping_type = mapping[word_type]
+    result = round(UserWordMastery.query.filter_by(user_id=user_id, word_type=word_type).count() / Word.query.filter_by(classification=mapping_type).count() * 100)
+    return result

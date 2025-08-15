@@ -1,5 +1,6 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+from json import loads
 
 db = SQLAlchemy()
 
@@ -15,8 +16,13 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
     wechat_openid = db.Column(db.String(100), unique=True, nullable=False)
     wechat_session_key = db.Column(db.String(100), nullable=False)
-    preferred_classification = db.Column(db.String(100), nullable=False)
+    preferred_classification = db.Column(db.String(100), nullable=False) # 当前学习的词书(cet4,cet6,雅思,托福等)
+    preferred_plan_daily = db.Column(db.Integer, default=20)
+    wallet_key = db.Column(db.String(100), nullable=False, unique=True) # 钱包唯一标识
+    word_power_amount = db.Column(db.Integer, nullable=False, default=0) # 词力值
 
+    stories = db.relationship('StoryCollection', backref='user')
+    word_friend = db.relationship('WordFriend', backref='user')
 
 class AIAgent(db.Model):
     __tablename__ = 'ai_agent'
@@ -62,6 +68,7 @@ class Word(db.Model):
     example_sentense_cn = db.Column(db.Text, nullable=False)
     usphone = db.Column(db.String(50), nullable=False)
     picture = db.Column(db.String(255))  # 存储图片路径或URL
+    classification = db.Column(db.String(100), nullable=False)
 
     # 与掌握表的关联
     mastered_by = db.relationship('UserWordMastery', back_populates='word')
@@ -73,6 +80,7 @@ class UserWordMastery(db.Model):
     user_word_mastery_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
     word_id = db.Column(db.Integer, db.ForeignKey('word.word_id'), nullable=False)
+    word_type = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.now())
 
     # 定义关系
@@ -94,3 +102,38 @@ class UserAchievement(db.Model):
     icon = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
+
+class TradeTransaction(db.Model):
+    __tablename__ = 'trade_transaction'
+
+    trade_transaction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    sender = db.Column(db.String(100), db.ForeignKey('user.wallet_key'), nullable=False)
+    receiver = db.Column(db.String(100), db.ForeignKey('user.wallet_key'), nullable=False)
+    amount = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now())
+    previous_hash = db.Column(db.String(100), nullable=False)
+    current_hash = db.Column(db.String(100), nullable=False)
+
+class StoryCollection(db.Model):
+    __tablename__ = 'story_collection'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    title = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    content_zh = db.Column(db.Text, nullable=False)
+    cover_img = db.Column(db.String(255))
+    selected_words = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.now())
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'content': self.content,
+            'content_zh': self.content_zh,
+            'cover_img': self.cover_img,
+            "selected_words": loads(self.selected_words) if self.selected_words else [],
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
