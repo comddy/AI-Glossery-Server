@@ -162,7 +162,7 @@ def story_generation():
             'https://open.bigmodel.cn/api/paas/v4/chat/completions',
             json=payload,
             headers=headers,
-            proxies=proxies,  # 添加代理配置
+            # proxies=proxies,  # 添加代理配置
             timeout=10
         )
 
