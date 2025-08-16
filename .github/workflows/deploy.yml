@@ -16,4 +16,4 @@ jobs:
           host: ${{ secrets.ALIYUN_SERVER_IP }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.ALIYUN_SSH_KEY }}
-          script: "cd /opt/AI-Glossery-Server && ./start_script.sh"
+          script: "cd /opt/AI-Glossery-Server && chmod 777 ./start_script.sh && ./start_script.sh"
