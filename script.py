@@ -643,9 +643,9 @@ def get_today_mastered_words():
 @app.route("/api/add_exp", methods=['POST'])
 def add_word_friend_exp():
     data = request.get_json()
-    word_friend_id = data.get('word_friend_id')
-    add_exp = data.get('add_exp')
-    current_level = data.get('level')
+    word_friend_id = int(data.get('word_friend_id'))
+    add_exp = int(data.get('add_exp'))
+    current_level = int(data.get('level'))
 
     # 查询用户关联的特定词友精灵
     user_word_friend = WordFriend.query.filter_by(
