@@ -8,5 +8,4 @@ eventlet
 greenlet
 gevent
 gunicorn
-kokoro_onnx
-soundfile
+edge-tts
