@@ -21,6 +21,6 @@ COPY deepspring-tech.com.pem .
 
 EXPOSE 5000
 # 设置 Gunicorn 启动命令
-CMD ["gunicorn", "-w", "5", "-b", "0.0.0.0:5000", "script:app", \
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "script:app", \
      "--keyfile", "deepspring-tech.com.key", \
      "--certfile", "deepspring-tech.com.pem"]

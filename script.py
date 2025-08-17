@@ -1,5 +1,4 @@
 import hashlib
-import time
 
 from flask import Flask, jsonify, request, send_file, Response
 from flask_cors import CORS
@@ -11,20 +10,17 @@ import requests
 from AchievementStrategy import AchievementService, daily_achievement_check
 from sql_alchemy import db, User, UserWordMastery, Word, ChatMessage, AIAgent, \
     WordFriendLevelConfig, UserAchievement, WordFriend, TradeTransaction, StoryCollection
-from crud.user import create_user, get_user_info, init_user, get_learning_percent
+from crud.user import get_user_info, init_user, get_learning_percent
 from crud.ai_agent import create_agent
 from crud.chat_message import insert_message, get_messages
 
 from datetime import timedelta, datetime, date
 from sqlalchemy import select, func, join
+import asyncio, edge_tts
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from utils.UserUtil import generate_hex_id
-
-import soundfile as sf
-import io
-from kokoro_onnx import Kokoro
 
 
 def create_app():
@@ -45,9 +41,6 @@ def create_app():
 
 
 app = create_app()
-
-# Initialize the audio generator
-audio_generator = Kokoro("kokoro-v1.0.onnx", "voices-v1.0.bin")
 
 # 允许所有域名跨域访问
 CORS(app)
@@ -884,48 +877,49 @@ def update_plan_amount():
 @app.route('/api/generate_audio', methods=['GET'])
 def generate_audio():
     """
-    Endpoint to generate audio from text
+    Endpoint to generate audio from text using edge_tts
 
-    Expects JSON payload with:
-    - text: the text to convert to speech
-    - voice: voice identifier (optional, default "af_sarah")
-    - speed: speech speed (optional, default 1.0)
-    - lang: language code (optional, default "en-us")
+    Expects GET parameters:
+    - text: the text to convert to speech (required)
+    - voice: voice identifier (optional, default "en-US-EricNeural")
+    - rate: speech speed (optional, default "+0%")
     """
     try:
         # Get request data
         text = request.args.get('text')
-        voice = 'af_sarah'
-        speed = 1.0
-        lang = "en-us"
+        voice = request.args.get('voice', 'en-US-JennyNeural')  # edge_tts 的默认推荐音色
+        rate = request.args.get('rate', '+0%')  # 速度调整，例如 "+10%", "-20%"
 
         if not text:
             return {"error": "Text parameter is required"}, 400
 
-        # Generate audio
-        samples, sample_rate = audio_generator.create(
-            text=text,
-            voice=voice,
-            speed=speed,
-            lang=lang
-        )
+        # 异步调用 edge_tts
+        async def generate():
+            communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate)
+            audio_data = b''
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_data += chunk["data"]
+            return audio_data
 
-        # Create in-memory WAV file
-        wav_io = io.BytesIO()
-        sf.write(wav_io, samples, sample_rate, format='WAV')
-        wav_io.seek(0)
+        # 在同步环境中运行异步代码
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        audio_data = loop.run_until_complete(generate())
+        loop.close()
 
         # Return as binary response
         return Response(
-            wav_io.read(),
-            mimetype='audio/wav',
+            audio_data,
+            mimetype='audio/mpeg',  # edge_tts 默认输出为 MP3 格式
             headers={
-                'Content-Disposition': 'attachment; filename=generated_audio.wav'
+                'Content-Disposition': 'attachment; filename=generated_audio.mp3'
             }
         )
 
     except Exception as e:
         return {"error": str(e)}, 500
+
 
 
 @app.route('/api/get_today_learned_words', methods=['GET'])
@@ -1077,4 +1071,5 @@ def learning_percent():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    # app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    app.run(debug=True, host='0.0.0.0', port=5000)
