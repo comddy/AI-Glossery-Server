@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from json import loads
@@ -73,6 +74,17 @@ class Word(db.Model):
     # 与掌握表的关联
     mastered_by = db.relationship('UserWordMastery', back_populates='word')
 
+    def to_dict(self):
+        return {
+            'word_id': self.word_id,
+            'word_en': self.word_en,
+            'word_cn': json.loads(self.word_cn),
+            'usphone': self.usphone,
+            'example_en': self.example_sentense_en,
+            'example_cn': self.example_sentense_cn,
+            'picture': self.picture,
+            "speech": f"https://dict.youdao.com/dictvoice?audio={self.word_en}&type=2"
+        }
 
 class UserWordMastery(db.Model):
     __tablename__ = 'user_word_mastery'

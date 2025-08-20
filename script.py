@@ -520,16 +520,7 @@ def get_words():
         words = Word.query.filter_by(classification=mapping_type).order_by(Word.word_id).offset(offset).limit(10).all()
 
         # 格式化返回数据
-        words_data = [{
-            'word_id': word.word_id,
-            'word_en': word.word_en,
-            'word_cn': json.loads(word.word_cn),
-            'usphone': word.usphone,
-            'example_en': word.example_sentense_en,
-            'example_cn': word.example_sentense_cn,
-            'picture': word.picture,
-            "speech": f"https://dict.youdao.com/dictvoice?audio={word.word_en}&type=2"
-        } for word in words]
+        words_data = [word.to_dict() for word in words]
 
         return jsonify({
             'success': True,
@@ -1070,5 +1061,16 @@ def learning_percent():
         'data': percent
     })
 
+# 一个游客模式的获取单词方法
+@app.route('/api/tourist_words', methods=['GET'])
+def tourist_words():
+    random_words = [word.to_dict() for word in Word.query.order_by(func.random()).limit(10).all()]
+    return jsonify({
+        'success': True,
+        'data': {
+            'words': random_words
+        }
+    })
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    # app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    app.run(debug=True, host='0.0.0.0', port=5000)
