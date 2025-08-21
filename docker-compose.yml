@@ -11,6 +11,7 @@ services:
     volumes:
       - ./deepspring-tech.com.key:/app/deepspring-tech.com.key:ro
       - ./deepspring-tech.com.pem:/app/deepspring-tech.com.pem:ro
+      - ./instance:/app/instance  # 持久化数据库文件
     restart: unless-stopped
     networks:
       - app-network
