@@ -88,16 +88,9 @@ class AchievementService:
     @staticmethod
     def unlock_achievement(user_id, name):
         """解锁成就"""
-        achievement = UserAchievement.query.filter_by(name=name).first()
+        achievement = UserAchievement.query.filter_by(user_id=user_id, name=name).first()
         if achievement:
-            user_achievement = UserAchievement(
-                user_id=user_id,
-                name=achievement.name,
-                description=achievement.description,
-                icon=achievement.icon,
-                is_active=True
-            )
-            db.session.add(user_achievement)
+            achievement.is_active = True
             db.session.commit()
 
     @staticmethod
