@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
-# 复制应用代码和证书文件（注意：移除了重复的 COPY . .）
+# 复制应用代码和证书文件
 COPY . .
 COPY deepspring-tech.com.key .
 COPY deepspring-tech.com.pem .
