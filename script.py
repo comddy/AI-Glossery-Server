@@ -260,18 +260,55 @@ def chat():
 
     except Exception as e:
         error_detail = str(e)
-        if hasattr(e, 'response') and e.response and hasattr(e.response, 'json'):
-            try:
-                error_detail = e.response.json()
-            except:
-                error_detail = e.response.text
-
         return jsonify({
             "success": False,
-            "message": "聊天对话过程中发生错误",
-            "error": error_detail
+            "message": error_detail
         }), 500
 
+@app.route('/api/word_image_generation', methods=['GET'])
+def word_image_generation():
+    try:
+        word = request.args.get('word')
+
+        header = {
+            'Authorization': 'Bearer pat_qgBj4YOM9z2Ur5NGBF1cYicN40kH6IeZpnmYv4sZOfQa81R8CFo6aMeGqFxxK0jn',
+            'Content-Type': 'application/json'
+        }
+        body = {
+            'workflow_id': '7542144636219932715',
+            'parameters': {
+                'input': word
+            }
+        }
+        response = requests.post(
+            'https://api.coze.cn/v1/workflow/run',
+            json=body,
+            headers=header,
+            timeout=15
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"AI图像生成接口请求失败，状态码: {response.status_code}")
+
+        response_data = response.json()
+        print("response_data", response_data)
+
+        if response_data['code'] != 0:
+            raise Exception(f"AI图像生成接口请求失败: {response_data['msg']}")
+
+        _data = json.loads(response_data['data'])
+        print(_data)
+        return jsonify({
+            "success": True,
+            "data": _data["data"]
+        })
+    except Exception as e:
+        error_detail = str(e)
+        print(error_detail)
+        return jsonify({
+            "success": False,
+            "message": error_detail
+        }), 500
 
 @app.route('/api/cover_image_generation', methods=['POST'])
 def cover_image_generation():
@@ -1072,4 +1109,5 @@ def tourist_words():
         }
     })
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    # app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    app.run(debug=True, host='0.0.0.0', port=5000)
