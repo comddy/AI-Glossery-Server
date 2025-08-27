@@ -13,13 +13,15 @@ from sql_alchemy import db, User, UserWordMastery, Word, ChatMessage, AIAgent, \
 from crud.user import get_user_info, init_user, get_learning_percent
 from crud.ai_agent import create_agent
 from crud.chat_message import insert_message, get_messages
+from werkzeug.utils import secure_filename
 
-from datetime import timedelta, datetime, date
+from datetime import datetime, date
 from sqlalchemy import select, func, join
 import asyncio, edge_tts
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from utils.CommonUtil import allowed_file, generate_random_filename
 from utils.UserUtil import generate_hex_id
 
 
@@ -29,6 +31,15 @@ def create_app():
     # 初始化扩展
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat_app.sqlite3'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+
+    # 图片上传配置
+    app.config['UPLOAD_FOLDER'] = 'static/upload'
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制上传大小为16MB
+    # 确保上传目录存在
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+
     db.init_app(app)
 
     # 确保在app上下文内初始化调度器
@@ -67,7 +78,7 @@ def wx_login():
     if response.get("openid") and response.get("session_key"):
         openid = response.get("openid")
         session_key = response.get("session_key")
-        user = User.query.filter_by(wechat_openid=openid).first()
+        user = User.query.filter_by(wechat_openid=openid, is_deleted=0).first()
         if user:
             # 用户已经存在，更新session_key，然后直接返回相应数据
             return jsonify({
@@ -540,12 +551,6 @@ def get_words():
             }), 400
 
         # 查询用户已掌握的单词数量
-        mapping = {
-            '雅思词汇': 'IELTS',
-            '六级词汇': 'CET6',
-            '四级词汇': 'CET4',
-        }
-        mapping_type = mapping[classification]
         mastered_count = UserWordMastery.query.filter_by(
             user_id=user_id,
             word_type=classification
@@ -554,7 +559,7 @@ def get_words():
         offset = mastered_count
 
         # 查询单词(从偏移量位置开始取10个)
-        words = Word.query.filter_by(classification=mapping_type).order_by(Word.word_id).offset(offset).limit(10).all()
+        words = Word.query.filter_by(classification=classification).order_by(Word.word_id).offset(offset).limit(10).all()
 
         # 格式化返回数据
         words_data = [word.to_dict() for word in words]
@@ -871,18 +876,26 @@ def get_transactions(wallet_key):
 
 @app.route("/api/update_preferred", methods=['POST'])
 def update_preferred_classification_book():
-    data = request.get_json()
-    print(data)
-    user_id = data['user_id']
-    preferred = data['preferred']
+    try:
+        data = request.get_json()
+        print(data)
+        user_id = data['user_id']
+        preferred = data['preferred']
+        preferred_plan_daily = data['preferred_plan_daily']
 
-    user = User.query.filter_by(user_id=user_id).first()
-    user.preferred_classification = preferred
-    db.session.commit()
-    return jsonify({
-        "success": True,
-        "message": "Preferred classification book updated"
-    })
+        user = User.query.filter_by(user_id=user_id).first()
+        user.preferred_classification = preferred
+        user.preferred_plan_daily = preferred_plan_daily
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": "Preferred classification book updated"
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 
 @app.route("/api/update_plan_amount", methods=['POST'])
@@ -1108,5 +1121,72 @@ def tourist_words():
             'words': random_words
         }
     })
+
+
+@app.route('/api/upload-avatar', methods=['POST'])
+def upload_avatar():
+    """图片上传接口"""
+    # 检查是否有文件部分
+    if 'file' not in request.files:
+        return jsonify({'error': '没有文件部分'}), 400
+
+    file = request.files['file']
+    user_id = request.form.get('user_id')
+
+    # 检查是否选择了文件
+    if file.filename == '':
+        return jsonify({'error': '未选择文件'}), 400
+
+    # 检查文件类型是否允许
+    if file and allowed_file(app, file.filename):
+        # 生成随机文件名
+        random_filename = generate_random_filename(file.filename)
+        # 安全地处理文件名
+        safe_filename = secure_filename(random_filename)
+        file_path = app.config['UPLOAD_FOLDER'] + '/' + safe_filename
+
+        user = User.query.filter_by(user_id=user_id).first()
+        # 删除之前的头像
+        if user.avatar_url and os.path.exists(user.avatar_url):
+            os.remove(user.avatar_url)
+
+        # 保存文件
+        file.save(file_path)
+        # 更新数据库
+        user.avatar_url = file_path
+        db.session.commit()
+
+        # 返回成功响应
+        return jsonify({
+            'success': True,
+            'message': '头像上传成功',
+            'url': file_path
+        }), 200
+    else:
+        return jsonify({'error': '不允许的文件类型'}), 400
+
+@app.route("/api/update-profile", methods=['POST'])
+def update_profile():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        username = data.get('username')
+        email = data.get('email')
+
+        user = User.query.filter_by(user_id=user_id).first()
+        user.username = username
+        user.email = email
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '更新成功',
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e),
+        }), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))

@@ -133,11 +133,5 @@ def init_user(openid, session_key):
 
 
 def get_learning_percent(user_id, word_type):
-    mapping = {
-        '雅思词汇': 'IELTS',
-        '六级词汇': 'CET6',
-        '四级词汇': 'CET4',
-    }
-    mapping_type = mapping[word_type]
-    result = round(UserWordMastery.query.filter_by(user_id=user_id, word_type=word_type).count() / Word.query.filter_by(classification=mapping_type).count() * 100)
+    result = round(UserWordMastery.query.filter_by(user_id=user_id, word_type=word_type).count() / Word.query.filter_by(classification=word_type).count() * 100)
     return result
