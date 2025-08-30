@@ -56,9 +56,10 @@ class WordFriend(db.Model):
 
     word_friend_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False, unique=True)
     level = db.Column(db.Integer, nullable=False, default=0)
     exp = db.Column(db.Integer, nullable=False, default=0)
+    nickname = db.Column(db.String(100)) # 用户自定义的名字
 
 class Word(db.Model):
     __tablename__ = 'word'
@@ -95,6 +96,7 @@ class UserWordMastery(db.Model):
     word_id = db.Column(db.Integer, db.ForeignKey('word.word_id'), nullable=False)
     word_type = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.now())
+    is_mastered = db.Column(db.Integer, nullable=False, default=1) # 0未掌握-进入生词本 1已掌握
 
     # 定义关系
     user = db.relationship('User', backref='mastered_words')

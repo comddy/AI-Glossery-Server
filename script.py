@@ -16,7 +16,7 @@ from crud.chat_message import insert_message, get_messages
 from werkzeug.utils import secure_filename
 
 from datetime import datetime, date
-from sqlalchemy import select, func, join
+from sqlalchemy import select, func, join, and_
 import asyncio, edge_tts
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -504,6 +504,7 @@ def mark_mastered():
         "user_id": 123,
         "word_id": 456,
         "word_type": 'CET4',
+        "is_mastered": 1
     }
     """
     data = request.get_json()
@@ -515,14 +516,28 @@ def mark_mastered():
     user_id = data['user_id']
     word_id = data['word_id']
     word_type = data['word_type']
+    is_mastered = data.get('is_mastered', 1) # 1已掌握 0未掌握-进入生词本
 
     # 检查是否已存在记录
-    if UserWordMastery.query.filter_by(user_id=user_id, word_id=word_id, word_type=word_type).first():
-        return jsonify({'message': 'Word already marked as mastered'}), 200
+    word = UserWordMastery.query.filter_by(user_id=user_id, word_id=word_id, word_type=word_type).first()
+    if word:
+        # 判断是否是生词本
+        if is_mastered == word.is_mastered:
+            return jsonify({
+                'success': False,
+                'message': 'Word already marked as mastered'
+            }), 200
+        else:
+            word.is_mastered = is_mastered
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Word already marked as mastered'
+            }), 200
 
     # 创建新记录
     try:
-        mastery = UserWordMastery(user_id=user_id, word_id=word_id, word_type=word_type, created_at=datetime.now())
+        mastery = UserWordMastery(user_id=user_id, word_id=word_id, word_type=word_type, created_at=datetime.now(), is_mastered=is_mastered)
         db.session.add(mastery)
         db.session.commit()
         AchievementService.check_achievements(user_id)  # 成就埋点
@@ -553,7 +568,8 @@ def get_words():
         # 查询用户已掌握的单词数量
         mastered_count = UserWordMastery.query.filter_by(
             user_id=user_id,
-            word_type=classification
+            word_type=classification,
+            is_mastered=1
         ).count()
 
         offset = mastered_count
@@ -753,13 +769,14 @@ def get_first_word_friend():
         })
 
 
-@app.route("/api/3dmodel/robot", methods=['GET'])
+@app.route("/api/3dmodel", methods=['GET'])
 def robot():
+    model_name = request.args.get('model', type=str)
     # 返回文件
     return send_file(
-        "static/RobotExpressive.glb",
+        f"static/3dmodel/{model_name}.glb",
         as_attachment=True,  # 强制下载（False则尝试浏览器预览）
-        download_name='RobotExpressive.glb'  # 下载时显示的文件名
+        download_name=f'{model_name}.glb'  # 下载时显示的文件名
     )
 
 
@@ -770,6 +787,7 @@ def test():
     today = date.today()
     word_count = db.session.query(db.func.count(UserWordMastery.user_word_mastery_id)) \
         .filter(UserWordMastery.user_id == user_id) \
+        .filter(UserWordMastery.is_mastered == 1) \
         .filter(db.func.date(UserWordMastery.created_at) == today) \
         .scalar()
     print(word_count)
@@ -1187,6 +1205,160 @@ def update_profile():
             'success': False,
             'message': str(e),
         }), 500
+
+@app.route("/api/model/list", methods=['GET'])
+def model_list():
+    user_id = request.args.get('user_id', type=int)
+    if user_id is None:
+        return jsonify({
+            'success': False,
+            'message': '参数异常'
+        }), 400
+    models = os.listdir("static/3dmodel")
+    models = [{
+        'id': i+1,
+        'name': name[:-4],
+        'is_owned': 1 if WordFriend.query.filter_by(user_id=user_id, name=name[:-4]).first() else 0,
+    } for i, name in enumerate(models)]
+    return jsonify({
+        'success': True,
+        'data': models
+    })
+
+@app.route('/api/unknown_words', methods=['GET'])
+def get_unknown_words():
+    # 获取请求参数
+    user_id = request.args.get('user_id', type=int)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    if not user_id:
+        return jsonify({'error': 'user_id is required'}), 400
+
+    # 使用join查询生词及其详细信息
+    query = db.session.query(Word, UserWordMastery).join(
+        UserWordMastery,
+        UserWordMastery.word_id == Word.word_id
+    ).filter(
+        and_(
+            UserWordMastery.user_id == user_id,
+            UserWordMastery.is_mastered == 0
+        )
+    ).order_by(UserWordMastery.created_at.desc())
+
+    # 分页处理
+    # pagination = query.paginate(
+    #     page=page,
+    #     per_page=per_page,
+    #     error_out=False
+    # )
+
+    # 构建响应数据
+    unknown_words = []
+    # for word, mastery_record in pagination.items:
+    #     word_dict = word.to_dict()
+    #     word_dict['created_at'] = mastery_record.created_at.isoformat() if mastery_record.created_at else None
+    #     word_dict['word_type'] = mastery_record.word_type
+    #     unknown_words.append(word_dict)
+
+    # 上面是分页的做法
+    # 我这里不分页了
+    for word, mastery_record in query.all():
+        word_dict = word.to_dict()
+        word_dict['created_at'] = mastery_record.created_at.isoformat() if mastery_record.created_at else None
+        word_dict['word_type'] = mastery_record.word_type
+        unknown_words.append(word_dict)
+
+    # 构建响应
+    response = {
+        'unknown_words': unknown_words
+    }
+
+    return jsonify(response), 200
+
+@app.route("/api/model/switch", methods=['POST'])
+def switch_model():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        model_name = data.get('name')
+        if not user_id or not model_name:
+            return jsonify({
+                'success': False,
+                'message': '参数错误'
+            }), 400
+
+        word_friend = WordFriend.query.filter_by(user_id=user_id).first()
+        word_friend.name = model_name
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '切换成功',
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+@app.route("/api/model/buy", methods=['POST'])
+def buy_model():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        model_name = data.get('name')
+        if not user_id or not model_name:
+            return jsonify({
+                'success': False,
+                'message': '参数错误'
+            }), 400
+
+        db_word_friend = WordFriend.query.filter_by(user_id=user_id, name=model_name).first()
+        if db_word_friend:
+            return jsonify({
+                'success': False,
+                'message': '已持有，请勿重复添加'
+            })
+        word_friend = WordFriend(user_id=user_id, name=model_name, nickname=model_name)
+        db.session.add(word_friend)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '购买成功!',
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+@app.route("/api/model/edit", methods=['POST'])
+def edit_model():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        name = data.get('name')
+        nickname = data.get('nickname')
+        if not user_id or not nickname:
+            return jsonify({
+                'success': False,
+                'message': '参数错误'
+            }), 400
+        word_friend = WordFriend.query.filter_by(user_id=user_id, name=name).first()
+        word_friend.nickname = nickname
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '修改成功!',
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))

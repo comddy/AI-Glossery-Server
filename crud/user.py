@@ -73,7 +73,8 @@ def get_user_info(user_id):
             'name': word_friend.name,
             'level': word_friend.level,
             'exp': word_friend.exp,
-            "next_level_require": next_level_config.exp_require
+            "next_level_require": next_level_config.exp_require,
+            'nickname': word_friend.nickname
         },
         'user_info': {
             "learning_days": learning_days,
@@ -126,7 +127,7 @@ def init_user(openid, session_key):
         )
         db.session.add(user_achievement)
     # 初始化词友
-    new_word_friend = WordFriend(user_id=user_id, name="机器人")
+    new_word_friend = WordFriend(user_id=user_id, name="robot", nickname="robot")
     db.session.add(new_word_friend)
     db.session.commit()
     return user
