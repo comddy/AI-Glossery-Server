@@ -22,6 +22,7 @@ class User(db.Model):
     wallet_key = db.Column(db.String(100), nullable=False, unique=True) # 钱包唯一标识
     word_power_amount = db.Column(db.Integer, nullable=False, default=0) # 词力值
     is_deleted = db.Column(db.Integer, nullable=False, default=0)
+    word_friend_name = db.Column(db.String(100), nullable=False, unique=True) # 用户当前选择的词友
 
     stories = db.relationship('StoryCollection', backref='user')
     word_friend = db.relationship('WordFriend', backref='user')

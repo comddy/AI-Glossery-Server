@@ -721,7 +721,11 @@ def add_word_friend_exp():
 
     return jsonify({
         'success': True,
-        'message': f'添加经验，当前等级: {user_word_friend.level}'
+        'message': f'添加经验，当前等级: {user_word_friend.level}',
+        'data': {
+            'level': user_word_friend.level,
+            'exp': user_word_friend.exp
+        }
     })
 
 
@@ -1219,6 +1223,7 @@ def model_list():
         'id': i+1,
         'name': name[:-4],
         'is_owned': 1 if WordFriend.query.filter_by(user_id=user_id, name=name[:-4]).first() else 0,
+        'price': 1000
     } for i, name in enumerate(models)]
     return jsonify({
         'success': True,
@@ -1288,13 +1293,28 @@ def switch_model():
                 'message': '参数错误'
             }), 400
 
-        word_friend = WordFriend.query.filter_by(user_id=user_id).first()
-        word_friend.name = model_name
+        word_friend = WordFriend.query.filter_by(user_id=user_id, name=model_name).first()
+        result = User.query.filter_by(user_id=user_id).update({
+            'word_friend_name': word_friend.name
+        }) # 同步更新用户当前选择词友
         db.session.commit()
-        return jsonify({
-            'success': True,
-            'message': '切换成功',
-        })
+        next_level_config = WordFriendLevelConfig.query.filter_by(exp_level=word_friend.level + 1).first()
+        if result > 0:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'nickname': word_friend.nickname,
+                    'level': word_friend.level,
+                    'exp': word_friend.exp,
+                    "next_level_require": next_level_config.exp_require,
+                },
+                'message': '切换成功'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '没有找到匹配的记录或更新失败'
+            })
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -1361,4 +1381,8 @@ def edit_model():
         })
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))
+    dev = 0
+    if dev == 1:
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=('deepspring-tech.com.pem', 'deepspring-tech.com.key'))

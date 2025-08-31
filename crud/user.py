@@ -49,7 +49,8 @@ def delete_user(user_id):
 
 def get_user_info(user_id):
     # 查询用户关联的第一个单词伙伴（按关联ID排序）
-    word_friend = WordFriend.query.filter_by(user_id=user_id).first()
+    user = User.query.filter_by(user_id=user_id).first()
+    word_friend = WordFriend.query.filter_by(user_id=user_id, name=user.word_friend_name).first()
     if not word_friend: # 该用户暂无单词伙伴
         return None
 
