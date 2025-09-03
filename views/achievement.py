@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify
-from sql_alchemy import db, UserAchievement
+from flask import Blueprint, request, jsonify, send_file
+from sql_alchemy import db, UserAchievement, User, WordFriendLevelConfig, WordFriend
 from AchievementStrategy import calculate_streak
 
 achievement_bp = Blueprint('achievement', __name__)
@@ -7,38 +7,40 @@ achievement_bp = Blueprint('achievement', __name__)
 @achievement_bp.route("/add_exp", methods=['POST'])
 def add_exp():
     data = request.get_json()
-    user_id = data.get('user_id')
-    exp_amount = data.get('exp_amount', 0)
-    
-    if not user_id or exp_amount <= 0:
-        return jsonify({'error': 'Invalid parameters'}), 400
-    
-    from sql_alchemy import WordFriend
-    word_friend = WordFriend.query.filter_by(user_id=user_id).first()
-    
-    if not word_friend:
-        return jsonify({'error': 'Word friend not found'}), 404
-    
-    word_friend.exp += exp_amount
-    
-    # 检查是否升级
-    from sql_alchemy import WordFriendLevelConfig
-    level_configs = WordFriendLevelConfig.query.order_by(WordFriendLevelConfig.exp_level).all()
-    
-    new_level = word_friend.level
-    for config in level_configs:
-        if word_friend.exp >= config.exp_require and config.exp_level > word_friend.level:
-            new_level = config.exp_level
-    
-    if new_level > word_friend.level:
-        word_friend.level = new_level
-    
-    db.session.commit()
-    
+    word_friend_id = int(data.get('word_friend_id'))
+    add_exp = int(data.get('add_exp'))
+    current_level = int(data.get('level'))
+
+    # 查询用户关联的特定词友精灵
+    user_word_friend = WordFriend.query.filter_by(
+        word_friend_id=word_friend_id
+    ).first()
+
+    level_config = WordFriendLevelConfig.query.filter_by(
+        exp_level=current_level + 1
+    ).first()
+
+    added_exp = add_exp + user_word_friend.exp
+
+    if added_exp / level_config.exp_require >= 1:
+        # 升级，修改等级
+        new_exp = added_exp % level_config.exp_require
+        user_word_friend.exp = new_exp
+        user_word_friend.level = current_level + 1
+    else:
+        user_word_friend.exp = added_exp
+
+    user = db.session.query(User).filter_by(user_id=user_word_friend.user_id).first()
+    user.word_power_amount += add_exp  # todo:这里暂时用加的经验代表词力值
+    db.session.commit()  # 修改直接查到之后原地改了，直接commit
+
     return jsonify({
-        'word_friend_id': word_friend.word_friend_id,
-        'current_exp': word_friend.exp,
-        'current_level': word_friend.level
+        'success': True,
+        'message': f'添加经验，当前等级: {user_word_friend.level}',
+        'data': {
+            'level': user_word_friend.level,
+            'exp': user_word_friend.exp
+        }
     })
 
 @achievement_bp.route("/achievements", methods=['GET'])
@@ -46,45 +48,27 @@ def get_achievements():
     user_id = request.args.get('user_id')
     
     if not user_id:
-        return jsonify({'error': 'user_id is required'}), 400
+        return jsonify({'success': False, 'message': 'user_id is required'}), 400
     
     achievements = UserAchievement.query.filter_by(user_id=user_id).all()
     
-    # 计算连续学习天数
-    streak = calculate_streak(user_id)
-    
     return jsonify({
-        'achievements': [{
+        'success': True,
+        'data': [{
             'achievement_id': achievement.user_achievement_id,
             'name': achievement.name,
-            'description': achievement.description,
+            'desc': achievement.description,
             'icon': achievement.icon,
             'is_active': achievement.is_active
-        } for achievement in achievements],
-        'learning_streak': streak
+        } for achievement in achievements]
     })
 
 @achievement_bp.route("/3dmodel", methods=['GET'])
 def get_3d_model():
-    user_id = request.args.get('user_id')
-    
-    if not user_id:
-        return jsonify({'error': 'user_id is required'}), 400
-    
-    from sql_alchemy import WordFriend
-    word_friend = WordFriend.query.filter_by(user_id=user_id).first()
-    
-    if not word_friend:
-        return jsonify({'error': 'Word friend not found'}), 404
-    
-    # 根据词友等级返回不同的3D模型
-    model_url = f"/static/3dmodels/level_{word_friend.level}.glb"
-    
-    return jsonify({
-        'model_url': model_url,
-        'level': word_friend.level
-    })
-
-@achievement_bp.route("/test", methods=['GET'])
-def test_endpoint():
-    return jsonify({'message': 'Test endpoint works!'})
+    model_name = request.args.get('model', type=str)
+    # 返回文件
+    return send_file(
+        f"static/3dmodel/{model_name}.glb",
+        as_attachment=True,  # 强制下载（False则尝试浏览器预览）
+        download_name=f'{model_name}.glb'  # 下载时显示的文件名
+    )

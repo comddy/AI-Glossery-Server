@@ -1,107 +1,157 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+
 from sql_alchemy import db, User
 from werkzeug.utils import secure_filename
 import os
 from utils.CommonUtil import allowed_file, generate_random_filename
-from crud.user import update_user, get_user_info
+from crud.user import update_user, get_user_info, get_learning_percent
 
 user_bp = Blueprint('user', __name__)
 
 @user_bp.route('/upload-avatar', methods=['POST'])
 def upload_avatar():
-    if 'avatar' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    
-    file = request.files['avatar']
+    """图片上传接口"""
+    # 检查是否有文件部分
+    if 'file' not in request.files:
+        return jsonify({'error': '没有文件部分'}), 400
+
+    file = request.files['file']
+    user_id = request.form.get('user_id')
+
+    # 检查是否选择了文件
     if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    
+        return jsonify({'error': '未选择文件'}), 400
+
+    # 检查文件类型是否允许
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        random_filename = generate_random_filename(filename)
-        file_path = os.path.join('static/upload', random_filename)
+        # 生成随机文件名
+        random_filename = generate_random_filename(file.filename)
+        # 安全地处理文件名
+        safe_filename = secure_filename(random_filename)
+        file_path = current_app.config['UPLOAD_FOLDER'] + '/' + safe_filename
+
+        user = User.query.filter_by(user_id=user_id).first()
+        # 删除之前的头像
+        if user.avatar_url and os.path.exists(user.avatar_url):
+            os.remove(user.avatar_url)
+
+        # 保存文件
         file.save(file_path)
-        
-        user_id = request.form.get('user_id')
-        user = User.query.get(user_id)
-        if user:
-            user.avatar_url = f'/static/upload/{random_filename}'
-            db.session.commit()
-            return jsonify({'avatar_url': user.avatar_url})
-    
-    return jsonify({'error': 'Invalid file'}), 400
+        # 更新数据库
+        user.avatar_url = file_path
+        db.session.commit()
+
+        # 返回成功响应
+        return jsonify({
+            'success': True,
+            'message': '头像上传成功',
+            'url': file_path
+        }), 200
+    else:
+        return jsonify({'error': '不允许的文件类型'}), 400
+
 
 @user_bp.route("/update-profile", methods=['POST'])
 def update_profile():
-    data = request.get_json()
-    user_id = data.get('user_id')
-    username = data.get('username')
-    
-    if not user_id or not username:
-        return jsonify({'error': 'Missing parameters'}), 400
-    
-    user = update_user(user_id, username=username)
-    if user:
-        return jsonify({'message': 'Profile updated successfully'})
-    
-    return jsonify({'error': 'User not found'}), 404
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        username = data.get('username')
+        email = data.get('email')
+
+        user = User.query.filter_by(user_id=user_id).first()
+        user.username = username
+        user.email = email
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '更新成功',
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': str(e),
+        }), 500
 
 @user_bp.route("/update_preferred", methods=['POST'])
 def update_preferred():
-    data = request.get_json()
-    user_id = data.get('user_id')
-    preferred_classification = data.get('preferred_classification')
-    
-    if not user_id or not preferred_classification:
-        return jsonify({'error': 'Missing parameters'}), 400
-    
-    user = update_user(user_id, preferred_classification=preferred_classification)
-    if user:
-        return jsonify({'message': 'Preferred classification updated'})
-    
-    return jsonify({'error': 'User not found'}), 404
+    try:
+        data = request.get_json()
+        print(data)
+        user_id = data['user_id']
+        preferred = data['preferred']
+        preferred_plan_daily = data['preferred_plan_daily']
+
+        user = User.query.filter_by(user_id=user_id).first()
+        user.preferred_classification = preferred
+        user.preferred_plan_daily = preferred_plan_daily
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": "Preferred classification book updated"
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 @user_bp.route("/update_plan_amount", methods=['POST'])
 def update_plan_amount():
     data = request.get_json()
-    user_id = data.get('user_id')
-    preferred_plan_daily = data.get('preferred_plan_daily')
-    
-    if not user_id or not preferred_plan_daily:
-        return jsonify({'error': 'Missing parameters'}), 400
-    
-    user = update_user(user_id, preferred_plan_daily=preferred_plan_daily)
-    if user:
-        return jsonify({'message': 'Daily plan updated'})
-    
-    return jsonify({'error': 'User not found'}), 404
+    print(data)
+    user_id = data['user_id']
+    amount = data['amount']
+
+    user = User.query.filter_by(user_id=user_id).first()
+    user.preferred_plan_daily = amount
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "message": "Preferred plan amount updated",
+        "data": amount
+    })
 
 @user_bp.route('/user/learning_percent', methods=['GET'])
 def get_learning_percent_api():
-    user_id = request.args.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'user_id is required'}), 400
-    
-    from crud.user import get_learning_percent
-    percent = get_learning_percent(user_id)
-    return jsonify({'learning_percent': percent})
+    # 获取数
+    user_id = request.args.get('user_id', type=int)
+    word_type = request.args.get('word_type', type=str)
+
+    # 验证参数
+    if not user_id and not word_type:
+        return jsonify({
+            'success': False,
+            'message': '参数有误'
+        }), 400
+
+    percent = get_learning_percent(user_id, word_type)
+    return jsonify({
+        'success': True,
+        'data': percent
+    })
 
 @user_bp.route('/user/first_word_friend', methods=['GET'])
 def get_first_word_friend():
-    user_id = request.args.get('user_id')
+    # 获取user_id参数
+    user_id = request.args.get('user_id', type=int)
+
+    # 验证参数
     if not user_id:
-        return jsonify({'error': 'user_id is required'}), 400
-    
-    from sql_alchemy import WordFriend
-    word_friend = WordFriend.query.filter_by(user_id=user_id).first()
-    
-    if word_friend:
         return jsonify({
-            'word_friend_id': word_friend.word_friend_id,
-            'name': word_friend.name,
-            'level': word_friend.level,
-            'exp': word_friend.exp,
-            'nickname': word_friend.nickname
+            'success': False,
+            'message': '必须提供user_id参数'
+        }), 400
+
+    user_info = get_user_info(user_id)
+    if user_info:
+        return jsonify({
+            'success': True,
+            'data': user_info
         })
-    
-    return jsonify({'error': 'Word friend not found'}), 404
+    else:
+        return jsonify({
+            'success': False,
+            "msg": "获取用户信息失败，请联系管理员"
+        })

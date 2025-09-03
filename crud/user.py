@@ -1,11 +1,12 @@
 # 创建用户
 from faker import Faker
 
-from sql_alchemy import User, db, WordFriend, WordFriendLevelConfig, UserWordMastery, UserAchievement, Word
+from sql_alchemy import db, WordFriend, WordFriendLevelConfig, UserWordMastery, UserAchievement, Word
 from utils.UserUtil import generate_hex_id
 
 
 def create_user(**kwargs):
+    from sql_alchemy import User
     user = User()
     for key, value in kwargs.items():
         if hasattr(user, key):
@@ -17,15 +18,18 @@ def create_user(**kwargs):
 
 # 获取用户
 def get_user_by_id(user_id):
+    from sql_alchemy import User
     return User.query.get(user_id)
 
 
 def get_user_by_username(username):
+    from sql_alchemy import User
     return User.query.filter_by(username=username).first()
 
 
 # 更新用户
 def update_user(user_id, **kwargs):
+    from sql_alchemy import User
     user = User.query.get(user_id)
     if not user:
         return None
@@ -40,6 +44,7 @@ def update_user(user_id, **kwargs):
 
 # 删除用户
 def delete_user(user_id):
+    from sql_alchemy import User
     user = User.query.get(user_id)
     if user:
         db.session.delete(user)
@@ -48,6 +53,7 @@ def delete_user(user_id):
     return False
 
 def get_user_info(user_id):
+    from sql_alchemy import User
     # 查询用户关联的第一个单词伙伴（按关联ID排序）
     user = User.query.filter_by(user_id=user_id).first()
     word_friend = WordFriend.query.filter_by(user_id=user_id, name=user.word_friend_name).first()

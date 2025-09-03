@@ -1,11 +1,11 @@
-from flask import Flask
+from flask import current_app
 import uuid
 
 
-def allowed_file(app: Flask, filename):
+def allowed_file(filename):
     """检查文件扩展名是否允许"""
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+           filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
 def generate_random_filename(original_filename):
     """生成随机文件名并保留原始扩展名"""
