@@ -9,3 +9,4 @@ greenlet
 gevent
 gunicorn
 edge-tts
+python-dotenv
