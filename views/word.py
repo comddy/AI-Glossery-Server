@@ -1,5 +1,6 @@
 import json
 
+import requests
 from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy import select, func, join, and_
 
