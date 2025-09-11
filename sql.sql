@@ -1,12 +1,20 @@
 -- 用户表
 CREATE TABLE IF NOT EXISTS user (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    avatar_url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	"user_id"	INTEGER,
+	"username"	TEXT NOT NULL UNIQUE,
+	"email"	TEXT,
+	"avatar_url"	TEXT,
+	"created_at"	TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	"updated_at"	TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	"wechat_openid"	BLOB UNIQUE,
+	"wechat_session_key"	TEXT,
+	"preferred_classification"	TEXT,
+	"wallet_key"	TEXT,
+	"word_power_amount"	INTEGER NOT NULL DEFAULT 0,
+	"preferred_plan_daily"	INTEGER DEFAULT 20,
+	"is_deleted"	INTEGER DEFAULT 0,
+	"word_friend_name"	TEXT NOT NULL DEFAULT 'robot',
+	PRIMARY KEY("user_id" AUTOINCREMENT)
 );
 
 -- AI Agent表
@@ -41,6 +49,7 @@ CREATE TABLE IF NOT EXISTS word_friend (
     level INTEGER NOT NULL DEFAULT 0, -- 等级
     exp INTEGER NOT NULL DEFAULT 0, -- 经验值
     user_id INTEGER NOT NULL,
+    nickname TEXT,
     FOREIGN KEY (user_id) REFERENCES user(user_id)
 )
 
@@ -58,12 +67,15 @@ CREATE TABLE IF NOT EXISTS word (
 
 -- 用户单词掌握表, 如果有记录说明掌握了
 CREATE TABLE IF NOT EXISTS user_word_mastery (
-    user_word_mastery_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    word_id INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
-    FOREIGN KEY (word_id) REFERENCES word(word_id)
+	"user_word_mastery_id"	INTEGER,
+	"user_id"	INTEGER NOT NULL,
+	"word_id"	INTEGER NOT NULL,
+	"created_at"	TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	"word_type"	TEXT,
+	"is_mastered"	INTEGER DEFAULT 1,
+	PRIMARY KEY("user_word_mastery_id" AUTOINCREMENT),
+	FOREIGN KEY("user_id") REFERENCES "user"("user_id"),
+	FOREIGN KEY("word_id") REFERENCES "word"("word_id")
 )
 
 CREATE TABLE IF NOT EXISTS word_friend_level_config(
@@ -115,17 +127,13 @@ CREATE TABLE IF NOT EXISTS trade_transaction(
 )
 
 CREATE TABLE IF NOT EXISTS story_collection(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT,
-    content TEXT,
-    content_zh TEXT,
-    cover_img TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-
-CREATE TABLE TABLE IF NOT EXISTS "user_story_collection_ref" (
 	"id"	INTEGER,
-	"user_id"	INTEGER NOT NULL,
-	"story_collection_id"	INTEGER NOT NULL,
+	"title"	TEXT,
+	"content"	TEXT,
+	"content_zh"	TEXT,
+	"cover_img"	TEXT,
+	"created_at"	TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	"user_id"	INTEGER,
+	"selected_words"	TEXT,
 	PRIMARY KEY("id" AUTOINCREMENT)
 )

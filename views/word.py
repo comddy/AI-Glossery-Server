@@ -8,7 +8,60 @@ from AchievementStrategy import AchievementService
 from sql_alchemy import db, UserWordMastery, Word
 from datetime import datetime
 
+from utils import CommonUtil
+
 word_bp = Blueprint('word', __name__)
+
+@word_bp.route('/rootsAndAffixes', methods=['GET'])
+def chat():
+    try:
+        word = request.args.get('word')
+
+        # 构建系统提示
+        prompt = """生成英文单词 `%s` 相关的词根词缀，只需要词根词缀的拆解和完整的解释，结构化输出成json，示例如下：
+                {
+                    "prefix": {
+                        "part": "",
+                        "explanation": ""
+                    },
+                    "root": {
+                        "part": "",
+                        "explanation": ""
+                    },
+                    "suffix": {
+                        "part": "",
+                        "explanation": ""
+                    }
+                }
+                prefix是前缀，root是词根，suffix是后缀，如果有的话就填入，输出只需要json,如果存在对应的词根词缀里面的内容保持json格式里面的内容只能用单引号包含，不要markdown格式，用中文回复，其他多的解释不要。
+                """ % word
+
+        # 构建完整消息数组
+        full_messages = [{"role": "user", "content": prompt}]
+
+        response = CommonUtil.request_glm_model(full_messages)
+
+        if response.status_code != 200:
+            raise Exception(f"AI接口请求失败，状态码: {response.status_code}")
+
+        response_data = response.json()
+        if not response_data or not response_data.get('choices') or not response_data['choices'][0].get('message'):
+            raise Exception('AI接口返回数据格式不正确')
+
+        raw_data = response_data['choices'][0]['message']['content'][7:-3].strip()
+        print(raw_data)
+        json_data = json.loads(raw_data)
+        return jsonify({
+            "success": True,
+            "data": json_data
+        })
+
+    except Exception as e:
+        error_detail = str(e)
+        return jsonify({
+            "success": False,
+            "message": error_detail
+        }), 500
 
 @word_bp.route('/word/mark-mastered', methods=['POST'])
 def mark_word_mastered():

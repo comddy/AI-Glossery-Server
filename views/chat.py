@@ -1,8 +1,7 @@
-import os
-
 from flask import Blueprint, request, jsonify
 from sql_alchemy import db, ChatMessage, AIAgent
 from crud.chat_message import insert_message, get_messages
+from utils import CommonUtil
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -11,42 +10,23 @@ def chat():
     try:
         data = request.get_json()
         messages = data.get('messages', [])
-        chat_type = data.get('type', 'default')
+        agent_id = data.get('agent_id')
+        print(messages)
 
         # 构建系统提示
-        system_prompt = f"""你是一个{chat_type}风格的英语老师Kris，是一款英语学习软件"VocalBuddy:词友星球"的专任AI老师，你需要和学生进行互动，帮助他们学习英语。你在自我介绍时，请扮演好你的角色，不要和学生聊与学习无关的内容。
-    请用生动有趣的方式教授英语知识，纠正学生的错误，并鼓励他们进步。你只有第一次回复时，需要先自我介绍。其他时候要尽可能简短回答。如果用户和你发中文，请引导他使用英语回答。"""
-
+        agent = AIAgent.query.filter_by(agent_id=agent_id).first()
+        system_prompt = agent.system_prompt
         # 构建完整消息数组
         full_messages = [{"role": "system", "content": system_prompt}]
         if isinstance(messages, list) and messages:
-            full_messages.extend(messages)
+            for message in messages:
+                full_messages.append({
+                    "role": message['sender'],
+                    "content": message['content']
+                })
 
-        # 调用AI接口
-        import requests
-        headers = {
-            'Authorization': f'Bearer {os.getenv("ZHIPUAI_API_KEY", "6eb6de30d0c6bab295e8730d7a8a71a0.gbET8XqExYOb99Ni")}',
-            'Content-Type': 'application/json'
-        }
-
-        payload = {
-            "model": "glm-4-flash-250414",
-            "messages": full_messages
-        }
-
-        # 添加代理配置（如果需要）
-        proxies = {
-            'http': 'http://127.0.0.1:33210',
-            'https': 'http://127.0.0.1:33210'
-        } if os.getenv('USE_PROXY', 'false').lower() == 'true' else None
-
-        response = requests.post(
-            'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-            json=payload,
-            headers=headers,
-            proxies=proxies,
-            timeout=15
-        )
+        response = CommonUtil.request_glm_model(full_messages)
+        print(response.content)
 
         if response.status_code != 200:
             raise Exception(f"AI接口请求失败，状态码: {response.status_code}")
@@ -67,8 +47,8 @@ def chat():
             "message": error_detail
         }), 500
 
-@chat_bp.route('/chat/messages', methods=['POST'])
-def get_chat_messages():
+@chat_bp.route('/chat/message/add', methods=['POST'])
+def add_chat_message():
     data = request.get_json()
 
     # 验证必要字段
@@ -80,10 +60,10 @@ def get_chat_messages():
         }), 400
 
     # 验证 sender_type
-    if data['sender_type'] not in ['user', 'agent']:
+    if data['sender_type'] not in ['user', 'system', 'assistant']:
         return jsonify({
             'success': False,
-            'message': 'sender_type 必须是 "user" 或 "agent"'
+            'message': 'sender_type 必须是 "user or system or assistant"'
         }), 400
 
     try:
@@ -127,7 +107,16 @@ def get_conversations():
         agent_id=agent_id
     )
 
-    messages_data = []
+    oralWelcome = "Hi there! 👋 Want to polish your English? I'm here to help! \
+    					Just send me any sentence you’re unsure about. I'll check it for you, fix any grammar errors, and give you some extra examples so you can learn from it. \
+    					Ready when you are! What's on your mind today?"
+    commonWelcome = "Hello! I'm your AI word mentor. How can I assist you?"
+    messages_data = [{
+        'message_id': -1,
+        'sender_type': 'assistant',
+        'content': oralWelcome if agent_id == 7 else commonWelcome,
+        'created_at': ''
+    }]
     for msg in messages:
         messages_data.append({
             'message_id': msg.message_id,

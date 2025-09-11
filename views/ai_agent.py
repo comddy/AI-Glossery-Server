@@ -6,6 +6,15 @@ from crud.ai_agent import create_agent
 
 ai_agent_bp = Blueprint('ai_agent', __name__)
 
+@ai_agent_bp.route("/agent/list", methods=['GET'])
+def ai_agent_list():
+    agents = AIAgent.query.all()
+    agents = [agent.to_dict() for agent in agents]
+    return jsonify({
+        'success': True,
+        'data': agents
+    })
+
 @ai_agent_bp.route("/add/agent", methods=['POST'])
 def add_agent():
     data = request.get_json()

@@ -20,6 +20,7 @@ from views import init_blueprints
 
 def create_app():
     app = Flask(__name__)
+    app.secret_key = 'cyxqadmin666'
 
     # 从环境变量加载配置（需要FLASK_前缀）
     app.config.from_prefixed_env()
@@ -30,7 +31,8 @@ def create_app():
     app.config.setdefault('UPLOAD_FOLDER', 'static/upload')
     app.config.setdefault('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'})
     app.config.setdefault('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)  # 限制上传大小为16MB
-    
+    app.config.setdefault('SECRET_KEY', 'dev-secret-key-change-in-production')  # 会话密钥
+
     # 确保上传目录存在
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])

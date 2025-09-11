@@ -39,6 +39,16 @@ class AIAgent(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now())
     updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
 
+    def to_dict(self):
+        return {
+            'id': self.agent_id,
+            'name': self.name,
+            'description': self.description,
+            'system_prompt': self.system_prompt,
+            'icon': self.avatar_url,
+            'selected': False
+        }
+
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
