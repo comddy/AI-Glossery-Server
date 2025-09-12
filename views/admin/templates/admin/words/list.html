@@ -1,0 +1,103 @@
+{% extends "admin/base.html" %}
+
+{% block title %}单词管理{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>单词管理</h2>
+    <a href="{{ url_for('admin.create_word') }}" class="btn btn-primary">
+        <i class="bi bi-plus"></i> 添加单词
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>英文单词</th>
+                        <th>中文释义</th>
+                        <th>美式音标</th>
+                        <th>分类</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for word in words %}
+                    <tr>
+                        <td>{{ word.word_id }}</td>
+                        <td>{{ word.word_en }}</td>
+                        <td>{{ word.word_cn[:30] }}{% if word.word_cn|length > 30 %}...{% endif %}</td>
+                        <td>{{ word.usphone }}</td>
+                        <td>{{ word.classification }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('admin.edit_word', word_id=word.word_id) }}" class="btn btn-outline-primary">
+                                    <i class="bi bi-pencil"></i> 编辑
+                                </a>
+                                <form method="POST" action="{{ url_for('admin.delete_word', word_id=word.word_id) }}" onsubmit="return confirm('确定要删除这个单词吗？');">
+                                    <button type="submit" class="btn btn-outline-danger">
+                                        <i class="bi bi-trash"></i> 删除
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 分页控件 -->
+        {% if words.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if words.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.list_words', page=words.prev_num, per_page=words.per_page) }}">上一页</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">上一页</span>
+                </li>
+                {% endif %}
+                
+                {% for page_num in words.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        {% if page_num == words.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.list_words', page=page_num, per_page=words.per_page) }}">{{ page_num }}</a>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if words.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.list_words', page=words.next_num, per_page=words.per_page) }}">下一页</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">下一页</span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        <div class="mt-3 text-center text-muted">
+            显示 {{ words.first }} - {{ words.last }} 条，共 {{ words.total }} 条记录
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "admin/base.html" %}
+
+{% block title %}聊天消息管理{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>聊天消息管理</h2>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>用户ID</th>
+                        <th>AI助手ID</th>
+                        <th>消息内容</th>
+                        <th>角色</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for message in chat_messages %}
+                    <tr>
+                        <td>{{ message.message_id }}</td>
+                        <td>{{ message.user_id }}</td>
+                        <td>{{ message.ai_agent_id }}</td>
+                        <td>{{ message.content[:30] }}{% if message.content|length > 30 %}...{% endif %}</td>
+                        <td>
+                            <span class="badge bg-{{ 'info' if message.role == 'user' else 'success' }}">
+                                {{ '用户' if message.role == 'user' else 'AI助手' }}
+                            </span>
+                        </td>
+                        <td>{{ message.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <form method="POST" action="{{ url_for('admin.delete_chat_message', message_id=message.message_id) }}" onsubmit="return confirm('确定要删除这条聊天消息吗？');">
+                                    <button type="submit" class="btn btn-outline-danger">
+                                        <i class="bi bi-trash"></i> 删除
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 分页控件 -->
+        {% if chat_messages.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if chat_messages.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.list_chat_messages', page=chat_messages.prev_num, per_page=chat_messages.per_page) }}">上一页</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">上一页</span>
+                </li>
+                {% endif %}
+                
+                {% for page_num in chat_messages.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        {% if page_num == chat_messages.page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.list_chat_messages', page=page_num, per_page=chat_messages.per_page) }}">{{ page_num }}</a>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if chat_messages.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.list_chat_messages', page=chat_messages.next_num, per_page=chat_messages.per_page) }}">下一页</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">下一页</span>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        <div class="mt-3 text-center text-muted">
+            显示 {{ chat_messages.first }} - {{ chat_messages.last }} 条，共 {{ chat_messages.total }} 条记录
+        </div>
+    </div>
+</div>
+{% endblock %}

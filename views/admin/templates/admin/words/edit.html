@@ -1,0 +1,67 @@
+{% extends "admin/base.html" %}
+
+{% block title %}编辑单词{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>编辑单词 #{{ word.word_id }}</h2>
+    <a href="{{ url_for('admin.list_words') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> 返回列表
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="word_en" class="form-label">英文单词 *</label>
+                    <input type="text" class="form-control" id="word_en" name="word_en" value="{{ word.word_en }}" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="usphone" class="form-label">美式音标 *</label>
+                    <input type="text" class="form-control" id="usphone" name="usphone" value="{{ word.usphone }}" required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="word_cn" class="form-label">中文释义 *</label>
+                <textarea class="form-control" id="word_cn" name="word_cn" rows="2" required>{{ word.word_cn }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="example_sentense_en" class="form-label">英文例句 *</label>
+                <textarea class="form-control" id="example_sentense_en" name="example_sentense_en" rows="2" required>{{ word.example_sentense_en }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="example_sentense_cn" class="form-label">中文例句翻译 *</label>
+                <textarea class="form-control" id="example_sentense_cn" name="example_sentense_cn" rows="2" required>{{ word.example_sentense_cn }}</textarea>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="classification" class="form-label">分类 *</label>
+                    <select class="form-select" id="classification" name="classification" required>
+                        <option value="cet4" {% if word.classification == 'cet4' %}selected{% endif %}>CET-4</option>
+                        <option value="cet6" {% if word.classification == 'cet6' %}selected{% endif %}>CET-6</option>
+                        <option value="ielts" {% if word.classification == 'ielts' %}selected{% endif %}>雅思</option>
+                        <option value="toefl" {% if word.classification == 'toefl' %}selected{% endif %}>托福</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="picture" class="form-label">图片URL</label>
+                    <input type="url" class="form-control" id="picture" name="picture" value="{{ word.picture or '' }}">
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check"></i> 更新单词
+                </button>
+                <a href="{{ url_for('admin.list_words') }}" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -6,6 +6,7 @@ from .ai_agent import ai_agent_bp
 from .content import content_bp
 from .transaction import transaction_bp
 from .achievement import achievement_bp
+from .admin import admin_bp
 
 def init_blueprints(app):
     """初始化所有蓝图"""
@@ -17,3 +18,4 @@ def init_blueprints(app):
     app.register_blueprint(content_bp, url_prefix='/api')
     app.register_blueprint(transaction_bp, url_prefix='/api')
     app.register_blueprint(achievement_bp, url_prefix='/api')
+    app.register_blueprint(admin_bp, url_prefix='/admin')

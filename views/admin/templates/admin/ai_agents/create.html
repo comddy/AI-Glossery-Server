@@ -1,0 +1,68 @@
+{% extends "admin/base.html" %}
+
+{% block title %}添加AI助手{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>添加AI助手</h2>
+    <a href="{{ url_for('admin.list_ai_agents') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> 返回列表
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="name" class="form-label">名称 *</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="category" class="form-label">分类 *</label>
+                    <input type="text" class="form-control" id="category" name="category" required>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="description" class="form-label">描述</label>
+                <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+            </div>
+            
+            <div class="mb-3">
+                <label for="system_prompt" class="form-label">系统提示词 *</label>
+                <textarea class="form-control" id="system_prompt" name="system_prompt" rows="5" required></textarea>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="avatar_url" class="form-label">头像URL</label>
+                    <input type="url" class="form-control" id="avatar_url" name="avatar_url">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="temperature" class="form-label">温度 (0-1)</label>
+                    <input type="number" class="form-control" id="temperature" name="temperature" step="0.1" min="0" max="1" value="0.7">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="max_tokens" class="form-label">最大令牌数</label>
+                    <input type="number" class="form-control" id="max_tokens" name="max_tokens" min="1" value="1000">
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="is_active" name="is_active" value="true" checked>
+                    <label class="form-check-label" for="is_active">激活状态</label>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check"></i> 创建AI助手
+                </button>
+                <a href="{{ url_for('admin.list_ai_agents') }}" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
