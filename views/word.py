@@ -319,3 +319,48 @@ def get_tourist_words():
             'words': random_words
         }
     })
+
+@word_bp.route('/word/choice_question', methods=['GET'])
+def generate_choice_question():
+
+    word = request.args.get('word', type=str)
+    url = "https://models.github.ai/inference/chat/completions"
+
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": "Bearer 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",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": "openai/gpt-4.1",
+        "messages": [
+            {
+                "role": "user",
+                "content": f"""
+                    根据给出的单词:{word},给出两个由此单词组成的句子，一个符合语境一个不符合，返回用json格式，示例如下：
+                    "word": "strategy",
+                    "A": "She used a strategy very carefully in her daily diet.",
+                    "B": "Our team developed a strategy to win the championship.",
+                    "answer": "B"
+                """
+            }
+        ]
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    # 检查响应状态
+    if response.status_code == 200:
+        print("请求成功！")
+        print("响应内容：")
+        result = response.json()
+        return jsonify({
+            'success': True,
+            'data': json.loads(result["choices"][0]["message"]["content"])
+        })
+
+    else:
+        print(f"请求失败，状态码：{response.status_code}")
+        print(f"错误信息：{response.text}")
