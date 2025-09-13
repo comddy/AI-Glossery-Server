@@ -107,14 +107,11 @@ def get_conversations():
         agent_id=agent_id
     )
 
-    oralWelcome = "Hi there! 👋 Want to polish your English? I'm here to help! \
-    					Just send me any sentence you’re unsure about. I'll check it for you, fix any grammar errors, and give you some extra examples so you can learn from it. \
-    					Ready when you are! What's on your mind today?"
-    commonWelcome = "Hello! I'm your AI word mentor. How can I assist you?"
+    welcome = AIAgent.query.filter_by(agent_id=agent_id).first().welcome
     messages_data = [{
         'message_id': -1,
         'sender_type': 'assistant',
-        'content': oralWelcome if agent_id == 7 else commonWelcome,
+        'content': welcome,
         'created_at': ''
     }]
     for msg in messages:

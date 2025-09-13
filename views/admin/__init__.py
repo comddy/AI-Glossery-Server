@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, current_app, make_response
 from sqlalchemy import inspect, text
 from sql_alchemy import db, User, Word, AIAgent, ChatMessage, WordFriend, UserWordMastery, WordFriendLevelConfig, UserAchievement, TradeTransaction, StoryCollection
 from datetime import datetime
@@ -52,7 +52,7 @@ def logout():
 @admin_bp.route('/')
 @login_required
 def index():
-    """Admin dashboard"""
+    """Admin dashboard with statistics"""
     models = get_all_models()
     model_names = [model.__name__ for model in models]
     
@@ -79,19 +79,79 @@ def index():
                 'count': 0
             })
     
-    return render_template('admin/index.html', model_names=model_names, model_stats=model_stats)
+    # Get additional statistics
+    stats = get_dashboard_statistics()
+    
+    return render_template('admin/index.html', model_names=model_names, model_stats=model_stats, stats=stats)
+
+def get_dashboard_statistics():
+    """Get detailed dashboard statistics"""
+    stats = {}
+    
+    # User statistics
+    stats['total_users'] = User.query.count()
+    stats['active_users_today'] = db.session.scalar(text("""
+        SELECT COUNT(DISTINCT user_id) FROM chat_messages 
+        WHERE DATE(created_at) = DATE('now')
+    """)) or 0
+    
+    # Chat statistics
+    stats['total_messages'] = ChatMessage.query.count()
+    stats['today_messages'] = db.session.scalar(text("""
+        SELECT COUNT(*) FROM chat_messages 
+        WHERE DATE(created_at) = DATE('now')
+    """)) or 0
+    
+    # Word statistics
+    stats['total_words'] = Word.query.count()
+    
+    # AI Agent statistics
+    stats['total_agents'] = AIAgent.query.count()
+    stats['active_agents'] = AIAgent.query.filter_by(is_active=True).count()
+    
+    # Recent activity (last 7 days)
+    recent_stats = db.session.execute(text("""
+        SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as message_count,
+            COUNT(DISTINCT user_id) as user_count
+        FROM chat_messages 
+        WHERE created_at >= DATE('now', '-7 days')
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+    """)).fetchall()
+    
+    stats['recent_activity'] = [
+        {'date': row[0], 'messages': row[1], 'users': row[2]}
+        for row in recent_stats
+    ]
+    
+    return stats
 
 # User CRUD operations
 @admin_bp.route('/users')
 @login_required
 def list_users():
-    """List all users with pagination"""
+    """List users with search and pagination"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    users = User.query.order_by(User.created_at.desc()).paginate(
+    search = request.args.get('search', '')
+    
+    query = User.query
+    
+    # 搜索功能
+    if search:
+        query = query.filter(
+            (User.username.ilike(f'%{search}%')) |
+            (User.email.ilike(f'%{search}%')) |
+            (User.wechat_openid.ilike(f'%{search}%'))
+        )
+    
+    users = query.order_by(User.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
-    return render_template('admin/users/list.html', users=users)
+    
+    return render_template('admin/users/list.html', users=users, search=search)
 
 @admin_bp.route('/users/create', methods=['GET', 'POST'])
 @login_required
@@ -167,13 +227,38 @@ def delete_user(user_id):
 @admin_bp.route('/words')
 @login_required
 def list_words():
-    """List all words with pagination"""
+    """List words with search and pagination"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    words = Word.query.order_by(Word.word_id.desc()).paginate(
+    search = request.args.get('search', '')
+    classification = request.args.get('classification', '')
+    
+    query = Word.query
+    
+    # 搜索功能
+    if search:
+        query = query.filter(
+            (Word.word_en.ilike(f'%{search}%')) |
+            (Word.word_cn.ilike(f'%{search}%'))
+        )
+    
+    # 分类筛选
+    if classification:
+        query = query.filter(Word.classification == classification)
+    
+    words = query.order_by(Word.word_id.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
-    return render_template('admin/words/list.html', words=words)
+    
+    # 获取所有分类用于筛选
+    classifications = db.session.query(Word.classification).distinct().all()
+    classifications = [c[0] for c in classifications if c[0]]
+    
+    return render_template('admin/words/list.html', 
+                         words=words, 
+                         search=search, 
+                         classification=classification,
+                         classifications=classifications)
 
 @admin_bp.route('/words/create', methods=['GET', 'POST'])
 @login_required
@@ -245,13 +330,36 @@ def delete_word(word_id):
 @admin_bp.route('/ai_agents')
 @login_required
 def list_ai_agents():
-    """List all AI agents with pagination"""
+    """List AI agents with search and pagination"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    ai_agents = AIAgent.query.order_by(AIAgent.agent_id.desc()).paginate(
+    search = request.args.get('search', '')
+    status_filter = request.args.get('status', '')
+    
+    query = AIAgent.query
+    
+    # 搜索功能
+    if search:
+        query = query.filter(
+            (AIAgent.name.ilike(f'%{search}%')) |
+            (AIAgent.description.ilike(f'%{search}%'))
+        )
+    
+    # 状态筛选
+    if status_filter:
+        if status_filter == 'active':
+            query = query.filter(AIAgent.is_active == True)
+        elif status_filter == 'inactive':
+            query = query.filter(AIAgent.is_active == False)
+    
+    ai_agents = query.order_by(AIAgent.agent_id.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
-    return render_template('admin/ai_agents/list.html', ai_agents=ai_agents)
+    
+    return render_template('admin/ai_agents/list.html', 
+                         ai_agents=ai_agents, 
+                         search=search, 
+                         status_filter=status_filter)
 
 @admin_bp.route('/ai_agents/create', methods=['GET', 'POST'])
 @login_required
@@ -265,9 +373,7 @@ def create_ai_agent():
                 system_prompt=request.form['system_prompt'],
                 avatar_url=request.form.get('avatar_url', ''),
                 is_active=bool(request.form.get('is_active', False)),
-                category=request.form['category'],
-                temperature=float(request.form.get('temperature', 0.7)),
-                max_tokens=int(request.form.get('max_tokens', 1000))
+                welcome=request.form.get('welcome', '')
             )
             db.session.add(ai_agent)
             db.session.commit()
@@ -292,9 +398,7 @@ def edit_ai_agent(agent_id):
             ai_agent.system_prompt = request.form['system_prompt']
             ai_agent.avatar_url = request.form.get('avatar_url', '')
             ai_agent.is_active = bool(request.form.get('is_active', False))
-            ai_agent.category = request.form['category']
-            ai_agent.temperature = float(request.form.get('temperature', 0.7))
-            ai_agent.max_tokens = int(request.form.get('max_tokens', 1000))
+            ai_agent.welcome = request.form.get('welcome', '')
             
             db.session.commit()
             flash('AI Agent updated successfully', 'success')
@@ -321,17 +425,87 @@ def delete_ai_agent(agent_id):
     
     return redirect(url_for('admin.list_ai_agents'))
 
+@admin_bp.route('/export_database')
+@login_required
+def export_database():
+    """Export database as SQLite file"""
+    try:
+        # 获取数据库文件路径
+        db_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+        if db_uri.startswith('sqlite:///'):
+            db_path = db_uri.replace('sqlite:///', '')
+            # 处理相对路径情况
+            if not os.path.isabs(db_path):
+                db_path = os.path.join(current_app.instance_path, db_path)
+            
+            # 确保文件存在
+            if os.path.exists(db_path):
+                # 生成时间戳文件名
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f'chat_app_backup_{timestamp}.sqlite3'
+                
+                # 读取数据库文件内容
+                with open(db_path, 'rb') as f:
+                    db_data = f.read()
+                
+                # 创建响应
+                response = make_response(db_data)
+                response.headers['Content-Type'] = 'application/octet-stream'
+                response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+                
+                flash('数据库导出成功', 'success')
+                return response
+            else:
+                flash('数据库文件不存在', 'error')
+                return redirect(url_for('admin.index'))
+        else:
+            flash('仅支持SQLite数据库导出', 'error')
+            return redirect(url_for('admin.index'))
+            
+    except Exception as e:
+        flash(f'数据库导出失败: {str(e)}', 'error')
+        return redirect(url_for('admin.index'))
+
 # Chat Message CRUD operations
 @admin_bp.route('/chat_messages')
 @login_required
 def list_chat_messages():
-    """List all chat messages with pagination"""
+    """List chat messages with search and pagination"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    chat_messages = ChatMessage.query.order_by(ChatMessage.created_at.desc()).paginate(
+    search = request.args.get('search', '')
+    user_id = request.args.get('user_id', type=int)
+    agent_id = request.args.get('agent_id', type=int)
+    
+    query = ChatMessage.query
+    
+    # 搜索功能
+    if search:
+        query = query.filter(ChatMessage.content.ilike(f'%{search}%'))
+    
+    # 用户筛选
+    if user_id:
+        query = query.filter(ChatMessage.user_id == user_id)
+    
+    # AI助手筛选
+    if agent_id:
+        query = query.filter(ChatMessage.agent_id == agent_id)
+    
+    chat_messages = query.order_by(ChatMessage.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
-    return render_template('admin/chat_messages/list.html', chat_messages=chat_messages)
+    
+    # 获取用户和AI助手列表用于筛选
+    users = User.query.with_entities(User.user_id, User.username).all()
+    agents = AIAgent.query.with_entities(AIAgent.agent_id, AIAgent.name).all()
+    
+    return render_template('admin/chat_messages/list.html', 
+                         chat_messages=chat_messages, 
+                         search=search,
+                         user_id=user_id,
+                         agent_id=agent_id,
+                         users=users,
+                         agents=agents)
 
 @admin_bp.route('/chat_messages/<int:message_id>/delete', methods=['POST'])
 @login_required

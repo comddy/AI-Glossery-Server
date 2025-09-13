@@ -14,13 +14,9 @@
     <div class="card-body">
         <form method="POST">
             <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-12 mb-3">
                     <label for="name" class="form-label">名称 *</label>
                     <input type="text" class="form-control" id="name" name="name" value="{{ ai_agent.name }}" required>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="category" class="form-label">分类 *</label>
-                    <input type="text" class="form-control" id="category" name="category" value="{{ ai_agent.category }}" required>
                 </div>
             </div>
             
@@ -35,18 +31,15 @@
             </div>
             
             <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-12 mb-3">
                     <label for="avatar_url" class="form-label">头像URL</label>
-                    <input type="url" class="form-control" id="avatar_url" name="avatar_url" value="{{ ai_agent.avatar_url }}">
+                    <input type="text" class="form-control" id="avatar_url" name="avatar_url" value="{{ ai_agent.avatar_url }}">
                 </div>
-                <div class="col-md-3 mb-3">
-                    <label for="temperature" class="form-label">温度 (0-1)</label>
-                    <input type="number" class="form-control" id="temperature" name="temperature" step="0.1" min="0" max="1" value="{{ ai_agent.temperature }}">
-                </div>
-                <div class="col-md-3 mb-3">
-                    <label for="max_tokens" class="form-label">最大令牌数</label>
-                    <input type="number" class="form-control" id="max_tokens" name="max_tokens" min="1" value="{{ ai_agent.max_tokens }}">
-                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="welcome" class="form-label">欢迎消息</label>
+                <textarea class="form-control" id="welcome" name="welcome" rows="3">{{ ai_agent.welcome }}</textarea>
             </div>
             
             <div class="mb-3">

@@ -34,29 +34,150 @@
         <div class="card">
             <div class="card-body text-center">
                 <i class="bi bi-database fs-1 text-info"></i>
-                <h5 class="card-title mt-2">数据库统计</h5>
-                <p class="card-text">查看数据库统计信息</p>
-                <a href="#" class="btn btn-info">查看统计</a>
+                <h5 class="card-title mt-2">数据库管理</h5>
+                <p class="card-text">数据库备份与导出</p>
+                <a href="{{ url_for('admin.export_database') }}" class="btn btn-info">导出数据库</a>
             </div>
         </div>
     </div>
 </div>
 
 <div class="mt-4">
-    <h4>数据库统计</h4>
+    <h4>系统概览</h4>
     <div class="row">
-        {% for stat in model_stats %}
-        <div class="col-md-4 mb-3">
+        <div class="col-md-3 mb-3">
             <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title">{{ stat.name }}</h6>
-                    <p class="card-text">
-                        <span class="badge bg-primary">{{ stat.count }}</span> 条记录
-                    </p>
+                <div class="card-body text-center">
+                    <i class="bi bi-people fs-3 text-primary"></i>
+                    <h5 class="card-title mt-2">总用户数</h5>
+                    <p class="card-text fs-4">{{ stats.total_users }}</p>
                 </div>
             </div>
         </div>
-        {% endfor %}
+        <div class="col-md-3 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-chat fs-3 text-success"></i>
+                    <h5 class="card-title mt-2">总消息数</h5>
+                    <p class="card-text fs-4">{{ stats.total_messages }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-book fs-3 text-info"></i>
+                    <h5 class="card-title mt-2">总单词数</h5>
+                    <p class="card-text fs-4">{{ stats.total_words }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-robot fs-3 text-warning"></i>
+                    <h5 class="card-title mt-2">AI助手数</h5>
+                    <p class="card-text fs-4">{{ stats.total_agents }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">今日活跃</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <i class="bi bi-person-check fs-2 text-primary"></i>
+                            <h6>活跃用户</h6>
+                            <p class="fs-5">{{ stats.active_users_today }}</p>
+                        </div>
+                        <div class="col-6">
+                            <i class="bi bi-chat-dots fs-2 text-success"></i>
+                            <h6>今日消息</h6>
+                            <p class="fs-5">{{ stats.today_messages }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">AI助手状态</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <i class="bi bi-play-circle fs-2 text-success"></i>
+                            <h6>激活助手</h6>
+                            <p class="fs-5">{{ stats.active_agents }}</p>
+                        </div>
+                        <div class="col-6">
+                            <i class="bi bi-pause-circle fs-2 text-secondary"></i>
+                            <h6>禁用助手</h6>
+                            <p class="fs-5">{{ stats.total_agents - stats.active_agents }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if stats.recent_activity %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">最近7天活动</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>消息数量</th>
+                                    <th>活跃用户</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in stats.recent_activity %}
+                                <tr>
+                                    <td>{{ activity.date }}</td>
+                                    <td>{{ activity.messages }}</td>
+                                    <td>{{ activity.users }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <h4>数据库统计</h4>
+        <div class="row">
+            {% for stat in model_stats %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ stat.name }}</h6>
+                        <p class="card-text">
+                            <span class="badge bg-primary">{{ stat.count }}</span> 条记录
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}

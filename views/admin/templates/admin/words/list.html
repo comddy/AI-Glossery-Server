@@ -5,9 +5,30 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>单词管理</h2>
-    <a href="{{ url_for('admin.create_word') }}" class="btn btn-primary">
-        <i class="bi bi-plus"></i> 添加单词
-    </a>
+    <div>
+        <form method="GET" class="d-inline me-2">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="搜索英文或中文单词" name="search" value="{{ search }}">
+                <select class="form-select" name="classification" style="max-width: 150px;">
+                    <option value="">所有分类</option>
+                    {% for class in classifications %}
+                    <option value="{{ class }}" {% if classification == class %}selected{% endif %}>{{ class }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-outline-secondary" type="submit">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if search or classification %}
+                <a href="{{ url_for('admin.list_words') }}" class="btn btn-outline-danger">
+                    <i class="bi bi-x"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+        <a href="{{ url_for('admin.create_word') }}" class="btn btn-primary">
+            <i class="bi bi-plus"></i> 添加单词
+        </a>
+    </div>
 </div>
 
 <div class="card">

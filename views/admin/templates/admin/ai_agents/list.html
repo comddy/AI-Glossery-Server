@@ -5,9 +5,29 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>AI 助手管理</h2>
-    <a href="{{ url_for('admin.create_ai_agent') }}" class="btn btn-primary">
-        <i class="bi bi-plus"></i> 添加AI助手
-    </a>
+    <div>
+        <form method="GET" class="d-inline me-2">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="搜索名称或描述" name="search" value="{{ search }}">
+                <select class="form-select" name="status" style="max-width: 120px;">
+                    <option value="">所有状态</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>激活</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>禁用</option>
+                </select>
+                <button class="btn btn-outline-secondary" type="submit">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if search or status_filter %}
+                <a href="{{ url_for('admin.list_ai_agents') }}" class="btn btn-outline-danger">
+                    <i class="bi bi-x"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+        <a href="{{ url_for('admin.create_ai_agent') }}" class="btn btn-primary">
+            <i class="bi bi-plus"></i> 添加AI助手
+        </a>
+    </div>
 </div>
 
 <div class="card">
@@ -19,7 +39,6 @@
                         <th>ID</th>
                         <th>名称</th>
                         <th>描述</th>
-                        <th>分类</th>
                         <th>状态</th>
                         <th>创建时间</th>
                         <th>操作</th>
@@ -31,7 +50,6 @@
                         <td>{{ agent.agent_id }}</td>
                         <td>{{ agent.name }}</td>
                         <td>{{ agent.description[:50] }}{% if agent.description|length > 50 %}...{% endif %}</td>
-                        <td>{{ agent.category }}</td>
                         <td>
                             <span class="badge bg-{{ 'success' if agent.is_active else 'secondary' }}">
                                 {{ '激活' if agent.is_active else '禁用' }}

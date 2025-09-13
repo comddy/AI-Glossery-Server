@@ -38,13 +38,13 @@ class AIAgent(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.now())
     updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
+    welcome = db.Column(db.Text)
 
     def to_dict(self):
         return {
             'id': self.agent_id,
             'name': self.name,
             'description': self.description,
-            'system_prompt': self.system_prompt,
             'icon': self.avatar_url,
             'selected': False
         }
