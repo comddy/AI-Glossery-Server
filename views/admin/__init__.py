@@ -498,8 +498,7 @@ def list_chat_messages():
     # 获取用户和AI助手列表用于筛选
     users = User.query.with_entities(User.user_id, User.username).all()
     agents = AIAgent.query.with_entities(AIAgent.agent_id, AIAgent.name).all()
-    
-    return render_template('admin/chat_messages/list.html', 
+    return render_template('admin/chat_messages/list.html',
                          chat_messages=chat_messages, 
                          search=search,
                          user_id=user_id,

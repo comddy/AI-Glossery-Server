@@ -52,11 +52,11 @@
                     <tr>
                         <td>{{ message.message_id }}</td>
                         <td>{{ message.user_id }}</td>
-                        <td>{{ message.ai_agent_id }}</td>
+                        <td>{{ message.agent_id }}</td>
                         <td>{{ message.content[:30] }}{% if message.content|length > 30 %}...{% endif %}</td>
                         <td>
                             <span class="badge bg-{{ 'info' if message.role == 'user' else 'success' }}">
-                                {{ '用户' if message.role == 'user' else 'AI助手' }}
+                                {{ '用户' if message.sender_type == 'user' else 'AI助手' }}
                             </span>
                         </td>
                         <td>{{ message.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
