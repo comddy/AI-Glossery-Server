@@ -115,6 +115,8 @@ def buy_model():
                 'message': '已持有，请勿重复添加'
             })
         word_friend = WordFriend(user_id=user_id, name=model_name, nickname=model_name)
+        user = User.query.filter_by(user_id=user_id).first()
+        user.word_power_amount -= 1000
         db.session.add(word_friend)
         db.session.commit()
         return jsonify({
