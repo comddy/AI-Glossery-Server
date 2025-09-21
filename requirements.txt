@@ -10,3 +10,4 @@ gevent
 gunicorn
 edge-tts
 python-dotenv
+json-repair

@@ -1,7 +1,7 @@
-import json
+import json_repair
 
 import requests
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify
 from sqlalchemy import select, func, join, and_
 
 from AchievementStrategy import AchievementService
@@ -49,8 +49,7 @@ def chat():
             raise Exception('AI接口返回数据格式不正确')
 
         raw_data = response_data['choices'][0]['message']['content'][7:-3].strip()
-        print(raw_data)
-        json_data = json.loads(raw_data)
+        json_data = json_repair.loads(raw_data)
         return jsonify({
             "success": True,
             "data": json_data
@@ -234,7 +233,7 @@ def get_today_learned_words():
         word_list = []
         for row in results:
             try:
-                meaning = json.loads(row.word_cn)[0]["tran"]
+                meaning = json_repair.loads(row.word_cn)[0]["tran"]
             except Exception as e:
                 meaning = ""
             word_list.append({
@@ -252,7 +251,6 @@ def get_today_learned_words():
 
     except Exception as main_error:
         # 添加详细错误日志
-        app.logger.error(f"获取今日单词失败 - 用户ID {user_id}: {str(main_error)}")
         return jsonify({
             'success': False,
             'message': '获取今日掌握单词列表失败',
@@ -353,12 +351,10 @@ def generate_choice_question():
 
     # 检查响应状态
     if response.status_code == 200:
-        print("请求成功！")
-        print("响应内容：")
         result = response.json()
         return jsonify({
             'success': True,
-            'data': json.loads(result["choices"][0]["message"]["content"])
+            'data': json_repair.loads(result["choices"][0]["message"]["content"])
         })
 
     else:
