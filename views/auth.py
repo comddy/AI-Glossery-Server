@@ -64,7 +64,7 @@ def wxlogin():
             })
     else:
         # error
-        print("Error Response JSON:", response.json())
+        print("Error Response JSON:", response)
         return jsonify({
             "success": False,
             "msg": response.json()
