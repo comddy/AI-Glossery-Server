@@ -34,12 +34,10 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     message_id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
 	agent_id INTEGER NOT NULL,
-    sender_type TEXT NOT NULL CHECK(sender_type IN ('user', 'agent')),
+    sender_type TEXT NOT NULL CHECK(sender_type IN ('user', 'assistant')),
     content TEXT NOT NULL,
     tokens INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
-	FOREIGN KEY (agent_id) REFERENCES ai_agent(user_id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 单词伙伴表
@@ -73,9 +71,7 @@ CREATE TABLE IF NOT EXISTS user_word_mastery (
 	"created_at"	TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	"word_type"	TEXT,
 	"is_mastered"	INTEGER DEFAULT 1,
-	PRIMARY KEY("user_word_mastery_id" AUTOINCREMENT),
-	FOREIGN KEY("user_id") REFERENCES "user"("user_id"),
-	FOREIGN KEY("word_id") REFERENCES "word"("word_id")
+	PRIMARY KEY("user_word_mastery_id" AUTOINCREMENT)
 )
 
 CREATE TABLE IF NOT EXISTS word_friend_level_config(

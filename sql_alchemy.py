@@ -22,7 +22,7 @@ class User(db.Model):
     wallet_key = db.Column(db.String(100), nullable=False, unique=True) # 钱包唯一标识
     word_power_amount = db.Column(db.Integer, nullable=False, default=0) # 词力值
     is_deleted = db.Column(db.Integer, nullable=False, default=0)
-    word_friend_name = db.Column(db.String(100), nullable=False, unique=True) # 用户当前选择的词友
+    word_friend_name = db.Column(db.String(100), nullable=False, default="robot") # 用户当前选择的词友
 
     stories = db.relationship('StoryCollection', backref='user')
     word_friend = db.relationship('WordFriend', backref='user')
@@ -54,9 +54,9 @@ class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
 
     message_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
-    agent_id = db.Column(db.Integer, db.ForeignKey('ai_agent.agent_id'), nullable=False)
-    sender_type = db.Column(db.String(10), nullable=False)  # 'user' or 'agent'
+    user_id = db.Column(db.Integer,  nullable=False)
+    agent_id = db.Column(db.Integer, nullable=False)
+    sender_type = db.Column(db.String(10), nullable=False)  # 'user' or 'assistant'
     content = db.Column(db.Text, nullable=False)
     tokens = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.now())
